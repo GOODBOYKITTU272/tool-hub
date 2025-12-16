@@ -1,13 +1,11 @@
 import { Link } from 'react-router-dom';
-import { useEffect } from 'react';
-import { getDashboardStats, mockRequests, mockTools, getToolById, getToolsByOwner } from '@/lib/mockData';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { ToolCard } from '@/components/tools/ToolCard';
-import { RequestCard } from '@/components/kanban/RequestCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { testSupabaseConnection } from '@/lib/testSupabase';
 import {
   Wrench,
   MessageSquare,
@@ -15,35 +13,87 @@ import {
   CheckCircle,
   Plus,
   ArrowRight,
+  Loader2,
 } from 'lucide-react';
 
+interface DashboardStats {
+  totalTools: number;
+  totalRequests: number;
+  pending: number;
+  completed: number;
+}
 
-const stats = getDashboardStats();
-const recentRequests = [...mockRequests]
-  .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-  .slice(0, 5);
+interface Tool {
+  id: string;
+  name: string;
+  description: string;
+  category: string | null;
+  type: string | null;
+  tags: string[] | null;
+  url: string | null;
+  owner_id: string | null;
+  owner_team: string | null;
+  created_by: string;
+  approved_by: string | null;
+  approval_status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+  updated_at: string;
+}
 
 const toolVariants: ('blue' | 'green' | 'white')[] = ['blue', 'green', 'white', 'white', 'blue'];
 
 export default function Dashboard() {
   const { currentUser } = useAuth();
+  const [stats, setStats] = useState<DashboardStats>({ totalTools: 0, totalRequests: 0, pending: 0, completed: 0 });
+  const [myTools, setMyTools] = useState<Tool[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const isAdmin = currentUser?.role === 'Admin';
   const isOwner = currentUser?.role === 'Owner';
   const canAddTools = isAdmin || isOwner;
 
-  // Filter tools and requests for Owner
-  const myTools = isOwner ? getToolsByOwner(currentUser?.id || '') : mockTools.slice(0, 5);
-  const myRequests = isOwner
-    ? mockRequests.filter(request => {
-      const tool = getToolById(request.toolId);
-      return tool?.ownerId === currentUser?.id;
-    })
-    : recentRequests;
-
-  // Test Supabase connection on mount
   useEffect(() => {
-    testSupabaseConnection();
-  }, []);
+    fetchDashboardData();
+  }, [currentUser]);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+
+      // Fetch tools
+      const { data: tools, error: toolsError } = await supabase
+        .from('tools')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (toolsError) throw toolsError;
+
+      // Fetch requests
+      const { data: requests, error: requestsError } = await supabase
+        .from('requests')
+        .select('*');
+
+      if (requestsError) throw requestsError;
+
+      // Calculate stats
+      const pending = requests?.filter(r => r.status === 'pending').length || 0;
+      const completed = requests?.filter(r => r.status === 'completed').length || 0;
+
+      setStats({
+        totalTools: tools?.length || 0,
+        totalRequests: requests?.length || 0,
+        pending,
+        completed,
+      });
+
+      setMyTools(tools || []);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -91,13 +141,13 @@ export default function Dashboard() {
         />
         <StatsCard
           title="Pending"
-          value={stats.pendingRequests}
+          value={stats.pending}
           icon={Clock}
           variant="yellow"
         />
         <StatsCard
           title="Completed"
-          value={stats.completedRequests}
+          value={stats.completed}
           icon={CheckCircle}
           variant="green"
         />
@@ -116,39 +166,26 @@ export default function Dashboard() {
             </Link>
           </Button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {myTools.slice(0, 3).map((tool, index) => (
-            <ToolCard key={tool.id} tool={tool} variant={toolVariants[index]} />
-          ))}
-        </div>
-      </section>
-
-      {/* Recent Activity */}
-      <section>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-display font-bold">
-            {isOwner ? 'Requests for My Tools' : 'Recent Activity'}
-          </h2>
-          <Button variant="ghost" asChild>
-            <Link to="/requests">
-              View all requests
-              <ArrowRight className="w-4 h-4 ml-1" />
-            </Link>
-          </Button>
-        </div>
-        <Card>
-          <CardContent className="p-4">
-            <div className="grid gap-3">
-              {myRequests.slice(0, 5).map((request) => (
-                <RequestCard
-                  key={request.id}
-                  request={request}
-                  draggable={false}
-                />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        {loading ? (
+          <div className="flex items-center justify-center p-8">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        ) : myTools.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {myTools.slice(0, 3).map((tool, index) => (
+              <ToolCard key={tool.id} tool={tool} variant={toolVariants[index]} />
+            ))}
+          </div>
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle>No tools yet</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">Get started by adding your first tool.</p>
+            </CardContent>
+          </Card>
+        )}
       </section>
     </div>
   );
