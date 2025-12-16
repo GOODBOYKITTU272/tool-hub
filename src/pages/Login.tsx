@@ -129,17 +129,52 @@ export default function Login() {
                 'Sign In'
               )}
             </Button>
+
           </form>
 
           <div className="mt-4 text-center">
             <button
               type="button"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              onClick={() => {
-                toast({
-                  title: 'Password Reset',
-                  description: 'Please contact your administrator to reset your password.',
-                });
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+              disabled={isLoading || !email}
+              onClick={async () => {
+                if (!email) {
+                  toast({
+                    title: 'Email Required',
+                    description: 'Please enter your email address first.',
+                    variant: 'destructive',
+                  });
+                  return;
+                }
+
+                setIsLoading(true);
+                try {
+                  const { supabase } = await import('@/lib/supabase');
+                  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                    redirectTo: `${window.location.origin}/password-reset`,
+                  });
+
+                  if (error) {
+                    toast({
+                      title: 'Error',
+                      description: error.message,
+                      variant: 'destructive',
+                    });
+                  } else {
+                    toast({
+                      title: 'Check Your Email',
+                      description: 'We sent you a password reset link. Please check your inbox.',
+                    });
+                  }
+                } catch (err) {
+                  toast({
+                    title: 'Error',
+                    description: 'Failed to send reset email. Please try again.',
+                    variant: 'destructive',
+                  });
+                } finally {
+                  setIsLoading(false);
+                }
               }}
             >
               Forgot password?
