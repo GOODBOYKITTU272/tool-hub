@@ -1,8 +1,25 @@
-import { Tool } from '@/lib/mockData';
+// Tool type from Supabase
+interface Tool {
+  id: string;
+  name: string;
+  description: string;
+  category: string | null;
+  type: string | null;
+  tags: string[] | null;
+  url: string | null;
+  owner_id: string | null;
+  owner_team: string | null;
+  created_by: string;
+  approved_by: string | null;
+  approval_status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+  updated_at: string;
+}
+
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, MessageSquare, ArrowRight } from 'lucide-react';
+import { ExternalLink, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface ToolCardProps {
@@ -24,18 +41,17 @@ export function ToolCard({ tool, variant = 'white' }: ToolCardProps) {
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between">
           <h3 className="font-display font-bold text-lg">{tool.name}</h3>
-          {tool.requestCount > 0 && (
+          {tool.approval_status === 'pending' && (
             <Badge
               variant={isLight ? 'secondary' : 'outline'}
               className={!isLight ? 'border-current' : ''}
             >
-              <MessageSquare className="w-3 h-3 mr-1" />
-              {tool.requestCount}
+              Pending
             </Badge>
           )}
         </div>
         <p className={`text-sm ${isLight ? 'text-muted-foreground' : 'opacity-80'}`}>
-          {tool.owner}
+          {tool.owner_team || 'No team assigned'}
         </p>
       </CardHeader>
       <CardContent className="pb-4">
