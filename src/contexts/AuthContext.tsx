@@ -32,44 +32,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Helper to normalize email (lowercase)
     const normalizeEmail = (email: string) => email.toLowerCase().trim();
 
-    // Fetch user profile from public.users
-    const fetchUserProfile = async (authUserId: string): Promise<User | null> => {
-        try {
-            console.log('🔍 Fetching user profile for ID:', authUserId);
+    // Fetch user profile from public.users with retry logic
+    const fetchUserProfile = async (authUserId: string, retries = 3): Promise<User | null> => {
+        for (let attempt = 1; attempt <= retries; attempt++) {
+            try {
+                console.log(`🔍 Fetching user profile for ID: ${authUserId} (Attempt ${attempt}/${retries})`);
 
-            const { data, error } = await supabase
-                .from('users')
-                .select('*')
-                .eq('id', authUserId)
-                .single();
+                const { data, error } = await supabase
+                    .from('users')
+                    .select('*')
+                    .eq('id', authUserId)
+                    .single();
 
-            if (error) {
-                console.error('❌ Error fetching user profile:', error);
-                console.error('Error details:', {
-                    message: error.message,
-                    code: error.code,
-                    details: error.details,
-                    hint: error.hint
-                });
+                if (error) {
+                    console.error(`❌ Error fetching user profile (Attempt ${attempt}):`, error);
+
+                    // If this is not the last attempt, wait before retrying
+                    if (attempt < retries) {
+                        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+                        continue;
+                    }
+
+                    // Last attempt failed - log but don't signout
+                    console.error('❌ All attempts failed. Error details:', {
+                        message: error.message,
+                        code: error.code,
+                        details: error.details,
+                        hint: error.hint
+                    });
+                    return null;
+                }
+
+                console.log('✅ User profile fetched successfully:', data);
+                return data as User;
+            } catch (error) {
+                console.error(`❌ Exception in fetchUserProfile (Attempt ${attempt}):`, error);
+
+                // If this is not the last attempt, wait before retrying
+                if (attempt < retries) {
+                    await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+                    continue;
+                }
+
                 return null;
             }
-
-            console.log('✅ User profile fetched successfully:', data);
-            return data as User;
-        } catch (error) {
-            console.error('❌ Exception in fetchUserProfile:', error);
-            return null;
         }
+        return null;
     };
 
 
     // Initialize auth state
     useEffect(() => {
         // Get initial session
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        supabase.auth.getSession().then(async ({ data: { session } }) => {
+            console.log('🔐 Initial session check:', session ? 'Session found' : 'No session');
             setSession(session);
+
             if (session?.user) {
-                fetchUserProfile(session.user.id).then(setCurrentUser);
+                console.log('👤 User in session:', session.user.email);
+                const profile = await fetchUserProfile(session.user.id);
+
+                if (profile) {
+                    console.log('✅ Profile loaded, setting current user:', profile.email);
+                    setCurrentUser(profile);
+                } else {
+                    console.warn('⚠️ Profile not found, but keeping session active');
+                    // DON'T sign out - just set currentUser to null
+                    // The user stays logged in via Supabase auth
+                    setCurrentUser(null);
+                }
             }
             setLoading(false);
         });
@@ -77,11 +108,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Listen for auth changes
         const {
             data: { subscription },
-        } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        } = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log('🔄 Auth state changed:', event, session ? 'Session exists' : 'No session');
             setSession(session);
+
             if (session?.user) {
                 const profile = await fetchUserProfile(session.user.id);
-                setCurrentUser(profile);
+
+                if (profile) {
+                    setCurrentUser(profile);
+                } else {
+                    console.warn('⚠️ Profile not found during auth change, but keeping session');
+                    // DON'T sign out - just set currentUser to null
+                    setCurrentUser(null);
+                }
             } else {
                 setCurrentUser(null);
             }

@@ -13,7 +13,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
         autoRefreshToken: true,
         persistSession: true,
-        detectSessionInUrl: true
+        detectSessionInUrl: true,
+        // Use a dedicated storage key so old/stale sessions don't interfere after env changes
+        storageKey: 'tool-hub-auth'
     }
 });
 
