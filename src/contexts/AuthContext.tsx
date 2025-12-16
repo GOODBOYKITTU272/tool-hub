@@ -44,11 +44,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     .eq('id', authUserId)
                     .single();
 
+                console.log(`📊 Fetch result - Data:`, data, `Error:`, error);
+
                 if (error) {
                     console.error(`❌ Error fetching user profile (Attempt ${attempt}):`, error);
 
                     // If this is not the last attempt, wait before retrying
                     if (attempt < retries) {
+                        console.log(`⏳ Waiting ${1000 * attempt}ms before retry...`);
                         await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
                         continue;
                     }
@@ -63,13 +66,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     return null;
                 }
 
-                console.log('✅ User profile fetched successfully:', data);
+                if (!data) {
+                    console.warn('⚠️ No error but data is null/undefined');
+                    return null;
+                }
+
+                console.log('✅ User profile fetched successfully!');
+                console.log('👤 Profile data:', {
+                    id: data.id,
+                    email: data.email,
+                    name: data.name,
+                    role: data.role
+                });
                 return data as User;
             } catch (error) {
                 console.error(`❌ Exception in fetchUserProfile (Attempt ${attempt}):`, error);
 
                 // If this is not the last attempt, wait before retrying
                 if (attempt < retries) {
+                    console.log(`⏳ Waiting ${1000 * attempt}ms before retry...`);
                     await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
                     continue;
                 }
@@ -77,31 +92,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 return null;
             }
         }
+        console.error('❌ All retry attempts exhausted');
         return null;
     };
 
 
     // Initialize auth state
     useEffect(() => {
+        console.log('🚀 AuthContext initializing...');
+
         // Get initial session
         supabase.auth.getSession().then(async ({ data: { session } }) => {
             console.log('🔐 Initial session check:', session ? 'Session found' : 'No session');
+            if (session) {
+                console.log('📧 Session user email:', session.user.email);
+                console.log('🆔 Session user ID:', session.user.id);
+            }
+
             setSession(session);
 
             if (session?.user) {
-                console.log('👤 User in session:', session.user.email);
+                console.log('👤 Fetching profile for user:', session.user.email);
                 const profile = await fetchUserProfile(session.user.id);
 
                 if (profile) {
-                    console.log('✅ Profile loaded, setting current user:', profile.email);
+                    console.log('✅ Profile loaded successfully!');
+                    console.log('🎯 Setting currentUser to:', profile.name, `(${profile.role})`);
                     setCurrentUser(profile);
+                    console.log('✨ currentUser state updated');
                 } else {
                     console.warn('⚠️ Profile not found, but keeping session active');
-                    // DON'T sign out - just set currentUser to null
-                    // The user stays logged in via Supabase auth
+                    console.log('🔄 Setting currentUser to null');
                     setCurrentUser(null);
                 }
+            } else {
+                console.log('❌ No session user found');
+                setCurrentUser(null);
             }
+
+            console.log('✅ Auth initialization complete, setting loading to false');
             setLoading(false);
         });
 
