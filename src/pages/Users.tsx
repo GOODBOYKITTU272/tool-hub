@@ -22,12 +22,14 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Plus, MoreHorizontal, Edit, Trash2, Shield, Eye, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { AddUserDialog } from '@/components/users/AddUserDialog';
 
 type UserProfile = Database['public']['Tables']['users']['Row'];
 
 export default function Users() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const { currentUser } = useAuth();
   const { toast } = useToast();
   const isAdmin = currentUser?.role === 'Admin';
@@ -63,6 +65,37 @@ export default function Users() {
     }
   };
 
+  const handleDeleteUser = async (user: UserProfile) => {
+    if (!confirm(`Are you sure you want to delete ${user.name}? This will also delete their Supabase Auth account.`)) {
+      return;
+    }
+
+    try {
+      // Delete from public.users (will cascade if configured, but let's be explicit)
+      // Note: We can't delete from auth.users via client SDK without service role.
+      // So we just remove the public profile and advise the admin.
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Profile Deleted',
+        description: 'The user profile has been removed. Please manually delete them from Supabase Auth as well.',
+      });
+
+      fetchUsers();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to delete user',
+        variant: 'destructive'
+      });
+    }
+  };
+
   if (!isAdmin) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
@@ -89,7 +122,7 @@ export default function Users() {
             Manage users and their permissions
           </p>
         </div>
-        <Button>
+        <Button onClick={() => setIsAddDialogOpen(true)}>
           <Plus className="w-4 h-4 mr-2" />
           Add User
         </Button>
@@ -120,13 +153,12 @@ export default function Users() {
                         <Avatar className="h-9 w-9">
                           <AvatarFallback className="bg-primary/10 text-primary font-medium">
                             {user.name
-                              .split(' ')
-                              .map((n) => n[0])
-                              .join('')}
+                              ? user.name.split(' ').map((n) => n[0]).join('')
+                              : 'U'}
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <p className="font-medium">{user.name}</p>
+                          <p className="font-medium">{user.name || 'Unknown User'}</p>
                           {user.id === currentUser?.id && (
                             <p className="text-xs text-muted-foreground">You</p>
                           )}
@@ -150,7 +182,7 @@ export default function Users() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {format(new Date(user.created_at), 'MMM d, yyyy')}
+                      {user.created_at ? format(new Date(user.created_at), 'MMM d, yyyy') : 'N/A'}
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -167,6 +199,7 @@ export default function Users() {
                           <DropdownMenuItem
                             className="text-destructive focus:text-destructive"
                             disabled={user.id === currentUser?.id}
+                            onClick={() => handleDeleteUser(user)}
                           >
                             <Trash2 className="w-4 h-4 mr-2" />
                             Delete
@@ -188,6 +221,12 @@ export default function Users() {
           </CardContent>
         </Card>
       )}
+
+      <AddUserDialog
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        onSuccess={fetchUsers}
+      />
     </div>
   );
 }
