@@ -1,6 +1,15 @@
 import { Shield, Zap, Users } from 'lucide-react';
+import { Link, Navigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Index() {
+  const { currentUser } = useAuth();
+
+  // Redirect to dashboard if already logged in
+  if (currentUser) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex flex-col">
       {/* Main Content - Centered */}
@@ -20,12 +29,12 @@ export default function Index() {
 
             {/* CTA Button */}
             <div className="pt-4">
-              <a
-                href="/login"
+              <Link
+                to="/login"
                 className="inline-flex items-center justify-center px-10 py-4 text-lg font-bold text-white bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 rounded-lg transition-all shadow-lg hover:shadow-xl uppercase"
               >
                 Start Product →
-              </a>
+              </Link>
             </div>
 
             {/* Supporting Line */}
