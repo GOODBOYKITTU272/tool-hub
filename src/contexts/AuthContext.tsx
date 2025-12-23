@@ -72,73 +72,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     // Fetch user profile from public.users with retry logic and timeout
-    const fetchUserProfileInternal = async (authUserId: string, retries = 3): Promise<User | null> => {
+    const fetchUserProfileInternal = async (authUserId: string, retries = 2): Promise<User | null> => {
         for (let attempt = 1; attempt <= retries; attempt++) {
             try {
-                console.log(`🔍 Fetching user profile for ID: ${authUserId} (Attempt ${attempt}/${retries})`);
+                console.log(`🔍 [Auth] Profile Fetch: Attempt ${attempt}/${retries} for ${authUserId}`);
 
-                const fetchPromise = supabase
+                const fetchPromise = (supabase
                     .from('users')
                     .select('*')
                     .eq('id', authUserId)
-                    .single();
+                    .single()) as Promise<any>;
 
-                // Add 10 second timeout
+                // Add 8 second timeout
                 const { data, error } = await withTimeout(
                     fetchPromise,
-                    10000,
-                    'Profile fetch timed out after 10 seconds'
+                    8000,
+                    'Profile fetch timed out after 8 seconds'
                 );
 
-                console.log(`📊 Fetch result - Data:`, data, `Error:`, error);
-
                 if (error) {
-                    console.error(`❌ Error fetching user profile (Attempt ${attempt}):`, error);
+                    console.error(`❌ [Auth] Fetch Error (Attempt ${attempt}):`, error.message, error.code);
 
-                    // If this is not the last attempt, wait before retrying
-                    if (attempt < retries) {
-                        console.log(`⏳ Waiting ${1000 * attempt}ms before retry...`);
-                        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-                        continue;
+                    // If table doesn't exist, stop retrying
+                    if (error.code === '42P01') {
+                        console.error('🛑 [Auth] CRITICAL: "users" table is missing in Supabase!');
+                        return null;
                     }
 
-                    // Last attempt failed - log but don't signout
-                    console.error('❌ All attempts failed. Error details:', {
-                        message: error.message,
-                        code: error.code,
-                        details: error.details,
-                        hint: error.hint
-                    });
+                    if (attempt < retries) {
+                        const delay = 500 * attempt;
+                        console.log(`⏳ [Auth] Retrying in ${delay}ms...`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        continue;
+                    }
                     return null;
                 }
 
                 if (!data) {
-                    console.warn('⚠️ No error but data is null/undefined');
+                    console.warn('⚠️ [Auth] Fetch succeeded but data is empty');
                     return null;
                 }
 
-                console.log('✅ User profile fetched successfully!');
-                console.log('👤 Profile data:', {
-                    id: data.id,
-                    email: data.email,
-                    name: data.name,
-                    role: data.role
-                });
+                console.log('✅ [Auth] Profile loaded successfully');
                 return data as User;
-            } catch (error) {
-                console.error(`❌ Exception in fetchUserProfile (Attempt ${attempt}):`, error);
+            } catch (err: any) {
+                console.error(`❌ [Auth] Exception (Attempt ${attempt}):`, err.message || err);
 
-                // If this is not the last attempt, wait before retrying
                 if (attempt < retries) {
-                    console.log(`⏳ Waiting ${1000 * attempt}ms before retry...`);
-                    await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+                    const delay = 500 * attempt;
+                    await new Promise(resolve => setTimeout(resolve, delay));
                     continue;
                 }
-
                 return null;
             }
         }
-        console.error('❌ All retry attempts exhausted');
         return null;
     };
 
