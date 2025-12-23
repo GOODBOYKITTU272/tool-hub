@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-ro
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { ReloadProtection } from "@/components/ReloadProtection";
 import { useEffect } from "react";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -46,6 +47,7 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <HashRedirectHandler />
+            <ReloadProtection />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/login" element={<Login />} />

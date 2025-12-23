@@ -7,7 +7,7 @@ import { AddToolDialog } from '@/components/tools/AddToolDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, Loader2 } from 'lucide-react';
+import { Plus, Search, Loader2, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 // Tool type from Supabase
@@ -35,6 +35,7 @@ export default function Tools() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [tools, setTools] = useState<Tool[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const { currentUser } = useAuth();
   const { toast } = useToast();
   const isAdmin = currentUser?.role === 'Admin';
@@ -109,6 +110,44 @@ export default function Tools() {
     setDialogOpen(false);
   };
 
+  const handleRefresh = async () => {
+    try {
+      setRefreshing(true);
+      console.log('🔄 Manually refreshing tools...');
+
+      const { data, error } = await supabase
+        .from('tools')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error refreshing tools:', error);
+        toast({
+          title: 'Refresh Failed',
+          description: 'Could not refresh tools. Please try again.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      setTools(data || []);
+      toast({
+        title: 'Refreshed',
+        description: `Loaded ${data?.length || 0} tools successfully`,
+      });
+      console.log('✅ Tools refreshed successfully');
+    } catch (error) {
+      console.error('Exception refreshing tools:', error);
+      toast({
+        title: 'Refresh Failed',
+        description: 'An unexpected error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -119,12 +158,26 @@ export default function Tools() {
             Manage and explore your internal tools
           </p>
         </div>
-        {canAddTools && (
-          <Button onClick={() => setDialogOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Tool
+        <div className="flex items-center gap-2">
+          {/* Refresh Button */}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleRefresh}
+            disabled={refreshing || loading}
+            title="Refresh tools"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>
-        )}
+
+          {/* Add Tool Button */}
+          {canAddTools && (
+            <Button onClick={() => setDialogOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Tool
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Search */}

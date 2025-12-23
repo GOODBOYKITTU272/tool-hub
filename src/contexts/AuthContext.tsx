@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { User as SupabaseUser, Session } from '@supabase/supabase-js';
 
@@ -28,21 +28,67 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
+    const authUpdateSeqRef = useRef(0);
+    const inFlightProfileRef = useRef<Promise<User | null> | null>(null);
+    const inFlightProfileUserIdRef = useRef<string | null>(null);
+
+    const PROFILE_CACHE_PREFIX = 'tool-hub-profile:';
 
     // Helper to normalize email (lowercase)
     const normalizeEmail = (email: string) => email.toLowerCase().trim();
 
-    // Fetch user profile from public.users with retry logic
-    const fetchUserProfile = async (authUserId: string, retries = 3): Promise<User | null> => {
+    // Helper to add timeout to promises
+    const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, errorMsg: string): Promise<T> => {
+        let timeoutId: number | undefined;
+        const timeoutPromise = new Promise<never>((_, reject) => {
+            timeoutId = window.setTimeout(() => reject(new Error(errorMsg)), timeoutMs);
+        });
+
+        try {
+            return await Promise.race([promise, timeoutPromise]);
+        } finally {
+            if (timeoutId !== undefined) clearTimeout(timeoutId);
+        }
+    };
+
+    const readCachedProfile = (authUserId: string): User | null => {
+        try {
+            if (typeof window === 'undefined') return null;
+            const raw = window.localStorage.getItem(`${PROFILE_CACHE_PREFIX}${authUserId}`);
+            if (!raw) return null;
+            return JSON.parse(raw) as User;
+        } catch {
+            return null;
+        }
+    };
+
+    const writeCachedProfile = (profile: User) => {
+        try {
+            if (typeof window === 'undefined') return;
+            window.localStorage.setItem(`${PROFILE_CACHE_PREFIX}${profile.id}`, JSON.stringify(profile));
+        } catch {
+            // ignore storage errors
+        }
+    };
+
+    // Fetch user profile from public.users with retry logic and timeout
+    const fetchUserProfileInternal = async (authUserId: string, retries = 3): Promise<User | null> => {
         for (let attempt = 1; attempt <= retries; attempt++) {
             try {
                 console.log(`🔍 Fetching user profile for ID: ${authUserId} (Attempt ${attempt}/${retries})`);
 
-                const { data, error } = await supabase
+                const fetchPromise = supabase
                     .from('users')
                     .select('*')
                     .eq('id', authUserId)
                     .single();
+
+                // Add 10 second timeout
+                const { data, error } = await withTimeout(
+                    fetchPromise,
+                    10000,
+                    'Profile fetch timed out after 10 seconds'
+                );
 
                 console.log(`📊 Fetch result - Data:`, data, `Error:`, error);
 
@@ -96,13 +142,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return null;
     };
 
+    const fetchUserProfile = (authUserId: string, retries = 3): Promise<User | null> => {
+        if (inFlightProfileRef.current && inFlightProfileUserIdRef.current === authUserId) {
+            return inFlightProfileRef.current;
+        }
+
+        inFlightProfileUserIdRef.current = authUserId;
+        inFlightProfileRef.current = fetchUserProfileInternal(authUserId, retries)
+            .then((profile) => {
+                if (profile) writeCachedProfile(profile);
+                return profile;
+            })
+            .finally(() => {
+                inFlightProfileRef.current = null;
+                inFlightProfileUserIdRef.current = null;
+            });
+
+        return inFlightProfileRef.current;
+    };
+
 
     // Initialize auth state
     useEffect(() => {
         console.log('🚀 AuthContext initializing...');
 
+        let isMounted = true;
+
         // Get initial session
         supabase.auth.getSession().then(async ({ data: { session } }) => {
+            const seq = ++authUpdateSeqRef.current;
             console.log('🔐 Initial session check:', session ? 'Session found' : 'No session');
             if (session) {
                 console.log('📧 Session user email:', session.user.email);
@@ -112,8 +180,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setSession(session);
 
             if (session?.user) {
+                const cached = readCachedProfile(session.user.id);
+                if (cached) {
+                    setCurrentUser(cached);
+                }
+
                 console.log('👤 Fetching profile for user:', session.user.email);
                 const profile = await fetchUserProfile(session.user.id);
+                if (!isMounted || seq !== authUpdateSeqRef.current) return;
 
                 if (profile) {
                     console.log('✅ Profile loaded successfully!');
@@ -138,11 +212,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange(async (event, session) => {
+            const seq = ++authUpdateSeqRef.current;
             console.log('🔄 Auth state changed:', event, session ? 'Session exists' : 'No session');
             setSession(session);
 
             if (session?.user) {
+                const cached = readCachedProfile(session.user.id);
+                if (cached) {
+                    setCurrentUser(cached);
+                }
+
                 const profile = await fetchUserProfile(session.user.id);
+                if (!isMounted || seq !== authUpdateSeqRef.current) return;
 
                 if (profile) {
                     setCurrentUser(profile);
@@ -157,7 +238,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setLoading(false);
         });
 
-        return () => subscription.unsubscribe();
+        return () => {
+            isMounted = false;
+            subscription.unsubscribe();
+        };
     }, []);
 
     // Login function
