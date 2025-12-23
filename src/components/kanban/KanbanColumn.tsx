@@ -1,7 +1,9 @@
-import { Request } from '@/lib/mockData';
+import { Database } from '@/lib/supabase';
 import { RequestCard } from './RequestCard';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
+
+type Request = Database['public']['Tables']['requests']['Row'];
 
 interface KanbanColumnProps {
   title: string;
@@ -73,3 +75,4 @@ export function KanbanColumn({
     </div>
   );
 }
+

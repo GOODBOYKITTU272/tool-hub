@@ -1,20 +1,6 @@
-// Tool type from Supabase
-interface Tool {
-  id: string;
-  name: string;
-  description: string;
-  category: string | null;
-  type: string | null;
-  tags: string[] | null;
-  url: string | null;
-  owner_id: string | null;
-  owner_team: string | null;
-  created_by: string;
-  approved_by: string | null;
-  approval_status: 'pending' | 'approved' | 'rejected';
-  created_at: string;
-  updated_at: string;
-}
+import { Database } from '@/lib/supabase';
+
+type Tool = Database['public']['Tables']['tools']['Row'];
 
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';

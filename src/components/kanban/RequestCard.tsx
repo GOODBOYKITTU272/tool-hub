@@ -1,9 +1,11 @@
-import { Request } from '@/lib/mockData';
+import { Database } from '@/lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
 import { Wrench, GripVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+type Request = Database['public']['Tables']['requests']['Row'];
 
 interface RequestCardProps {
   request: Request;
@@ -29,7 +31,7 @@ export function RequestCard({ request, draggable = true, onClick }: RequestCardP
             <div className="flex items-center gap-2 mb-2">
               <Badge variant="outline" className="text-xs font-normal">
                 <Wrench className="w-3 h-3 mr-1" />
-                {request.toolName}
+                Tool ID: {request.tool_id.slice(0, 8)}...
               </Badge>
             </div>
             <h4 className="font-semibold text-sm mb-1 line-clamp-2">
@@ -39,9 +41,9 @@ export function RequestCard({ request, draggable = true, onClick }: RequestCardP
               {request.description}
             </p>
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{request.creatorName}</span>
+              <span>User ID: {request.created_by.slice(0, 8)}...</span>
               <span>
-                {formatDistanceToNow(new Date(request.createdAt), {
+                {formatDistanceToNow(new Date(request.created_at), {
                   addSuffix: true,
                 })}
               </span>
@@ -52,3 +54,4 @@ export function RequestCard({ request, draggable = true, onClick }: RequestCardP
     </Card>
   );
 }
+

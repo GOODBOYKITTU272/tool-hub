@@ -85,6 +85,30 @@ CREATE TRIGGER users_updated_at
     EXECUTE FUNCTION public.handle_updated_at();
 
 -- =====================================================
+-- AUTOMATIC PROFILE CREATION
+-- =====================================================
+-- Trigger to create a profile for new users on signup
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO public.users (id, email, name, role, must_change_password)
+    VALUES (
+        NEW.id,
+        NEW.email,
+        COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', 'New User'),
+        'Observer', -- Default role for new signups
+        FALSE
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Enable the trigger
+CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- =====================================================
 -- 2. TOOLS TABLE
 -- =====================================================
 -- This table stores internal tools information
@@ -192,7 +216,134 @@ CREATE TRIGGER tools_updated_at
     EXECUTE FUNCTION public.handle_updated_at();
 
 -- =====================================================
--- 3. INSERT SAMPLE ADMIN USER
+-- 3. REQUESTS TABLE
+-- =====================================================
+-- This table stores tool feature and access requests
+
+CREATE TABLE IF NOT EXISTS public.requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tool_id UUID NOT NULL REFERENCES public.tools(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'Requested' CHECK (status IN ('Requested', 'In Progress', 'Completed', 'Rejected')),
+    created_by UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enable Row Level Security
+ALTER TABLE public.requests ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policy: Users can see all requests
+CREATE POLICY "Log-in users can see all requests"
+    ON public.requests
+    FOR SELECT
+    USING (auth.uid() IS NOT NULL);
+
+-- RLS Policy: Users can create requests
+CREATE POLICY "Users can create requests"
+    ON public.requests
+    FOR INSERT
+    WITH CHECK (auth.uid() IS NOT NULL);
+
+-- RLS Policy: Admins can update any request
+CREATE POLICY "Admins can update requests"
+    ON public.requests
+    FOR UPDATE
+    USING (
+        EXISTS (
+            SELECT 1 FROM public.users
+            WHERE id = auth.uid() AND role = 'Admin'
+        )
+    );
+
+-- RLS Policy: Owners can update requests for their own tools
+CREATE POLICY "Owners can update requests for own tools"
+    ON public.requests
+    FOR UPDATE
+    USING (
+        EXISTS (
+            SELECT 1 FROM public.tools
+            WHERE id = tool_id AND (owner_id = auth.uid() OR created_by = auth.uid())
+        )
+    );
+
+-- Create trigger for requests updated_at
+CREATE TRIGGER requests_updated_at
+    BEFORE UPDATE ON public.requests
+    FOR EACH ROW
+    EXECUTE FUNCTION public.handle_updated_at();
+
+-- =====================================================
+-- 4. AUDIT_LOGS TABLE
+-- =====================================================
+-- This table stores system activity logs
+
+CREATE TABLE IF NOT EXISTS public.audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    user_name TEXT,
+    user_email TEXT,
+    action TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    entity_id TEXT,
+    before_state JSONB,
+    after_state JSONB,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enable Row Level Security
+ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policy: Admins can read all logs
+CREATE POLICY "Admins can read all audit logs"
+    ON public.audit_logs
+    FOR SELECT
+    USING (
+        EXISTS (
+            SELECT 1 FROM public.users
+            WHERE id = auth.uid() AND role = 'Admin'
+        )
+    );
+
+-- RLS Policy: System can insert logs (via functions/triggers or app)
+CREATE POLICY "Admins/App can insert audit logs"
+    ON public.audit_logs
+    FOR INSERT
+    WITH CHECK (auth.uid() IS NOT NULL);
+
+-- =====================================================
+-- 5. NOTIFICATIONS TABLE
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS public.notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    related_id UUID,
+    read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enable Row Level Security
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policy: Users can read their own notifications
+CREATE POLICY "Users can read own notifications"
+    ON public.notifications
+    FOR SELECT
+    USING (auth.uid() = user_id);
+
+-- RLS Policy: Users can update their own notifications (mark as read)
+CREATE POLICY "Users can update own notifications"
+    ON public.notifications
+    FOR UPDATE
+    USING (auth.uid() = user_id);
+
+-- =====================================================
+-- 6. INSERT SAMPLE ADMIN USER
 -- =====================================================
 -- IMPORTANT: This creates a sample admin user
 -- You need to create this user in Supabase Auth first!

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Request } from '@/lib/mockData';
+import { Database } from '@/lib/supabase';
 import {
   Dialog,
   DialogContent,
@@ -22,6 +22,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { Wrench, User, Calendar, Clock } from 'lucide-react';
+
+type Request = Database['public']['Tables']['requests']['Row'];
 
 interface RequestDetailModalProps {
   request: Request | null;
@@ -86,7 +88,7 @@ export function RequestDetailModal({
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline" className="gap-1">
               <Wrench className="w-3 h-3" />
-              {request.toolName}
+              Tool ID: {request.tool_id.slice(0, 8)}...
             </Badge>
             <Badge variant={statusVariants[request.status]}>
               {request.status}
@@ -105,21 +107,21 @@ export function RequestDetailModal({
               <User className="w-4 h-4" />
               <span>Created by:</span>
               <span className="text-foreground font-medium">
-                {request.creatorName}
+                {request.created_by.slice(0, 8)}...
               </span>
             </div>
             <div className="flex items-center gap-2 text-muted-foreground">
               <Calendar className="w-4 h-4" />
               <span>Created:</span>
               <span className="text-foreground font-medium">
-                {format(new Date(request.createdAt), 'MMM d, yyyy')}
+                {format(new Date(request.created_at), 'MMM d, yyyy')}
               </span>
             </div>
             <div className="flex items-center gap-2 text-muted-foreground col-span-2">
               <Clock className="w-4 h-4" />
               <span>Last updated:</span>
               <span className="text-foreground font-medium">
-                {format(new Date(request.updatedAt), 'MMM d, yyyy h:mm a')}
+                {format(new Date(request.updated_at), 'MMM d, yyyy h:mm a')}
               </span>
             </div>
           </div>
@@ -172,3 +174,4 @@ export function RequestDetailModal({
     </Dialog>
   );
 }
+

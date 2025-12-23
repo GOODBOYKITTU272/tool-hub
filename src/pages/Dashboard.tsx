@@ -16,6 +16,8 @@ import {
   Loader2,
 } from 'lucide-react';
 
+import { Database } from '@/lib/supabase';
+
 interface DashboardStats {
   totalTools: number;
   totalRequests: number;
@@ -23,22 +25,7 @@ interface DashboardStats {
   completed: number;
 }
 
-interface Tool {
-  id: string;
-  name: string;
-  description: string;
-  category: string | null;
-  type: string | null;
-  tags: string[] | null;
-  url: string | null;
-  owner_id: string | null;
-  owner_team: string | null;
-  created_by: string;
-  approved_by: string | null;
-  approval_status: 'pending' | 'approved' | 'rejected';
-  created_at: string;
-  updated_at: string;
-}
+type Tool = Database['public']['Tables']['tools']['Row'];
 
 const toolVariants: ('blue' | 'green' | 'white')[] = ['blue', 'green', 'white', 'white', 'blue'];
 
@@ -60,25 +47,32 @@ export default function Dashboard() {
     try {
       setLoading(true);
 
-      // Fetch tools
+      // Fetch tools count and recent tools
       const { data: tools, error: toolsError } = await supabase
         .from('tools')
         .select('*')
-        .order('created_at', { ascending: false })
-        .limit(5);
+        .order('created_at', { ascending: false });
 
-      if (toolsError) throw toolsError;
+      if (toolsError) {
+        if (toolsError.code === '42P01') {
+          console.error('Error: "tools" table does not exist. Please run supabase-schema.sql');
+        } else {
+          throw toolsError;
+        }
+      }
 
-      // Fetch requests
+      // Fetch requests count
       const { data: requests, error: requestsError } = await supabase
         .from('requests')
         .select('*');
 
-      if (requestsError) throw requestsError;
+      if (requestsError && requestsError.code !== '42P01') {
+        throw requestsError;
+      }
 
-      // Calculate stats
-      const pending = requests?.filter(r => r.status === 'pending').length || 0;
-      const completed = requests?.filter(r => r.status === 'completed').length || 0;
+      // Calculate stats based on real database records
+      const pending = requests?.filter(r => r.status === 'pending' || r.status === 'Requested').length || 0;
+      const completed = requests?.filter(r => r.status === 'completed' || r.status === 'Completed').length || 0;
 
       setStats({
         totalTools: tools?.length || 0,
@@ -87,7 +81,8 @@ export default function Dashboard() {
         completed,
       });
 
-      setMyTools(tools || []);
+      // Show top 3 tools on dashboard
+      setMyTools(tools?.slice(0, 5) || []);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {

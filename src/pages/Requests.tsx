@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { mockRequests, getToolById } from '@/lib/mockData';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { KanbanBoard } from '@/components/kanban/KanbanBoard';
 import { Button } from '@/components/ui/button';
@@ -11,20 +11,83 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus } from 'lucide-react';
+import { Plus, Loader2 } from 'lucide-react';
+import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
+import { useToast } from '@/hooks/use-toast';
+
+interface Request {
+  id: string;
+  tool_id: string;
+  title: string;
+  description: string;
+  status: 'Requested' | 'In Progress' | 'Completed' | 'Rejected';
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
 
 export default function Requests() {
   const [toolFilter, setToolFilter] = useState<string>('all');
+  const [requests, setRequests] = useState<Request[]>([]);
+  const [loading, setLoading] = useState(true);
   const { currentUser } = useAuth();
+  const { toast } = useToast();
   const isOwner = currentUser?.role === 'Owner';
+  const isAdmin = currentUser?.role === 'Admin';
 
-  // Filter requests for Owner's tools
-  const myRequests = mockRequests.filter(request => {
-    const tool = getToolById(request.toolId);
-    return tool?.ownerId === currentUser?.id;
+  useEffect(() => {
+    fetchRequests();
+  }, []);
+
+  const fetchRequests = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('requests')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        if (error.code !== '42P01') { // Ignore if table doesn't exist yet
+          throw error;
+        }
+        return;
+      }
+      setRequests(data || []);
+    } catch (error) {
+      console.error('Error fetching requests:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load requests. Please ensure tables are created.',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useRealtimeSubscription('requests', (payload) => {
+    if (payload.eventType === 'INSERT') {
+      setRequests(prev => [payload.new as Request, ...prev]);
+    } else if (payload.eventType === 'UPDATE') {
+      setRequests(prev => prev.map(r => r.id === payload.new.id ? payload.new as Request : r));
+    } else if (payload.eventType === 'DELETE') {
+      setRequests(prev => prev.filter(r => r.id !== payload.old.id));
+    }
   });
 
-  const allRequests = mockRequests;
+  const allRequests = requests;
+  const filteredByTool = toolFilter === 'all'
+    ? allRequests
+    : allRequests.filter(r => r.tool_id === toolFilter);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -43,7 +106,7 @@ export default function Requests() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All tools</SelectItem>
-              {/* Add tool filter options here */}
+              {/* Tool IDs would be added here dynamically from a tools list */}
             </SelectContent>
           </Select>
           <Button>
@@ -53,31 +116,11 @@ export default function Requests() {
         </div>
       </div>
 
-      {/* Tabs for Owner, regular view for others */}
-      {isOwner ? (
-        <Tabs defaultValue="my-requests" className="w-full">
-          <TabsList>
-            <TabsTrigger value="my-requests">My Requests ({myRequests.length})</TabsTrigger>
-            <TabsTrigger value="all-requests">All Requests ({allRequests.length})</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="my-requests" className="mt-6">
-            <KanbanBoard
-              requests={myRequests}
-              toolFilter={toolFilter === 'all' ? undefined : toolFilter}
-            />
-          </TabsContent>
-
-          <TabsContent value="all-requests" className="mt-6">
-            <KanbanBoard
-              requests={allRequests}
-              toolFilter={toolFilter === 'all' ? undefined : toolFilter}
-            />
-          </TabsContent>
-        </Tabs>
-      ) : (
-        <KanbanBoard toolFilter={toolFilter === 'all' ? undefined : toolFilter} />
-      )}
+      <KanbanBoard
+        requests={filteredByTool}
+        onRequestsChange={setRequests}
+      />
     </div>
   );
 }
+

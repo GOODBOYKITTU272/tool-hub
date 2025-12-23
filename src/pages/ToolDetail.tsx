@@ -1,16 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
-import {
-  getToolById,
-  mockToolOverviews,
-  mockToolArchitectures,
-  mockToolLanguageTech,
-  mockToolHosting,
-  mockToolEnvVariables,
-  mockToolDemoLogins,
-  getRequestsByTool,
-  mockChangeRequests,
-  type ChangeRequest,
-} from '@/lib/mockData';
+import { supabase, Database } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { ChangeRequestDialog } from '@/components/modals/ChangeRequestDialog';
 import { Button } from '@/components/ui/button';
@@ -28,18 +17,24 @@ import {
   Eye,
   EyeOff,
   Lock,
+  Loader2,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
+
+type Tool = Database['public']['Tables']['tools']['Row'];
+type Request = Database['public']['Tables']['requests']['Row'];
 
 export default function ToolDetail() {
   const { id } = useParams<{ id: string }>();
-  const tool = getToolById(id || '');
+  const [tool, setTool] = useState<Tool | null>(null);
+  const [requests, setRequests] = useState<Request[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [visibleEnvVars, setVisibleEnvVars] = useState<Set<string>>(new Set());
   const [changeRequestDialogOpen, setChangeRequestDialogOpen] = useState(false);
-  const [changeRequests, setChangeRequests] = useState<ChangeRequest[]>(mockChangeRequests);
   const { toast } = useToast();
   const { currentUser } = useAuth();
 
@@ -47,24 +42,59 @@ export default function ToolDetail() {
   const isOwner = currentUser?.role === 'Owner';
   const isObserver = currentUser?.role === 'Observer';
 
-  if (!tool) {
-    return (
-      <div className="text-center py-12">
-        <h1 className="text-2xl font-bold mb-4">Tool not found</h1>
-        <Button asChild>
-          <Link to="/tools">Back to Tools</Link>
-        </Button>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (id) {
+      fetchToolData();
+    }
+  }, [id]);
 
-  const overview = mockToolOverviews[tool.id];
-  const architecture = mockToolArchitectures[tool.id];
-  const languageTech = mockToolLanguageTech[tool.id];
-  const hosting = mockToolHosting[tool.id];
-  const envVariables = mockToolEnvVariables[tool.id] || [];
-  const demoLogin = mockToolDemoLogins[tool.id];
-  const requests = getRequestsByTool(tool.id);
+  const fetchToolData = async () => {
+    try {
+      setLoading(true);
+
+      // Fetch tool
+      const { data: toolData, error: toolError } = await supabase
+        .from('tools')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (toolError) throw toolError;
+      setTool(toolData);
+
+      // Fetch requests
+      const { data: requestsData, error: requestsError } = await supabase
+        .from('requests')
+        .select('*')
+        .eq('tool_id', id)
+        .order('created_at', { ascending: false });
+
+      if (requestsError && requestsError.code !== '42P01') throw requestsError;
+      setRequests(requestsData || []);
+
+    } catch (error) {
+      console.error('Error fetching tool data:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load tool details',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useRealtimeSubscription('requests', (payload) => {
+    if (payload.new && (payload.new as Request).tool_id !== id) return;
+
+    if (payload.eventType === 'INSERT') {
+      setRequests(prev => [payload.new as Request, ...prev]);
+    } else if (payload.eventType === 'UPDATE') {
+      setRequests(prev => prev.map(r => r.id === payload.new.id ? payload.new as Request : r));
+    } else if (payload.eventType === 'DELETE') {
+      setRequests(prev => prev.filter(r => r.id !== payload.old.id));
+    }
+  });
 
   const toggleEnvVar = (id: string) => {
     setVisibleEnvVars((prev) => {
@@ -86,9 +116,24 @@ export default function ToolDetail() {
     });
   };
 
-  const handleChangeRequestSubmitted = (request: ChangeRequest) => {
-    setChangeRequests([request, ...changeRequests]);
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!tool) {
+    return (
+      <div className="text-center py-12">
+        <h1 className="text-2xl font-bold mb-4">Tool not found</h1>
+        <Button asChild>
+          <Link to="/tools">Back to Tools</Link>
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -114,7 +159,7 @@ export default function ToolDetail() {
                 </a>
               )}
             </div>
-            <p className="text-muted-foreground">{tool.owner}</p>
+            <p className="text-muted-foreground">{tool.owner_team || 'Internal Service'}</p>
           </div>
         </div>
         {isObserver ? (
@@ -174,8 +219,8 @@ export default function ToolDetail() {
                   <p className="font-medium">{tool.name}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Owner</p>
-                  <p className="font-medium">{tool.owner}</p>
+                  <p className="text-sm text-muted-foreground">Team</p>
+                  <p className="font-medium">{tool.owner_team || '—'}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">URL</p>
@@ -195,7 +240,7 @@ export default function ToolDetail() {
                 <div>
                   <p className="text-sm text-muted-foreground">Created</p>
                   <p className="font-medium">
-                    {format(new Date(tool.createdAt), 'MMM d, yyyy')}
+                    {format(new Date(tool.created_at), 'MMM d, yyyy')}
                   </p>
                 </div>
               </div>
@@ -204,12 +249,6 @@ export default function ToolDetail() {
                 <p className="text-sm text-muted-foreground mb-2">Description</p>
                 <p>{tool.description}</p>
               </div>
-
-              {overview && (
-                <div className="prose prose-sm max-w-none">
-                  <div className="whitespace-pre-wrap">{overview.content}</div>
-                </div>
-              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -226,13 +265,7 @@ export default function ToolDetail() {
               )}
             </CardHeader>
             <CardContent>
-              {architecture ? (
-                <div className="prose prose-sm max-w-none">
-                  <div className="whitespace-pre-wrap">{architecture.markdownContent}</div>
-                </div>
-              ) : (
-                <p className="text-muted-foreground">No architecture documentation yet.</p>
-              )}
+              <p className="text-muted-foreground">No architecture documentation yet.</p>
             </CardContent>
           </Card>
         </TabsContent>
@@ -249,24 +282,16 @@ export default function ToolDetail() {
               )}
             </CardHeader>
             <CardContent>
-              {languageTech ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Language</p>
-                    <p className="font-medium text-lg">{languageTech.language}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Framework</p>
-                    <p className="font-medium text-lg">{languageTech.framework}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Version</p>
-                    <p className="font-medium text-lg">{languageTech.version}</p>
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <p className="text-sm text-muted-foreground">Language</p>
+                  <p className="font-medium text-lg">{tool.type || '—'}</p>
                 </div>
-              ) : (
-                <p className="text-muted-foreground">No language/tech information yet.</p>
-              )}
+                <div>
+                  <p className="text-sm text-muted-foreground">Category</p>
+                  <p className="font-medium text-lg">{tool.category || '—'}</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -283,31 +308,7 @@ export default function ToolDetail() {
               )}
             </CardHeader>
             <CardContent>
-              {hosting ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Provider</p>
-                    <p className="font-medium text-lg">{hosting.provider}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Region</p>
-                    <p className="font-medium text-lg">{hosting.region}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Deployment URL</p>
-                    <a
-                      href={hosting.deploymentUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-medium text-lg text-primary hover:underline"
-                    >
-                      {hosting.deploymentUrl}
-                    </a>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-muted-foreground">No hosting information yet.</p>
-              )}
+              <p className="text-muted-foreground">No hosting information yet.</p>
             </CardContent>
           </Card>
         </TabsContent>
@@ -332,55 +333,6 @@ export default function ToolDetail() {
                     Environment variables are only visible to Owners and Admins for security purposes.
                   </p>
                 </div>
-              ) : !isAdmin && !isOwner ? (
-                <div className="flex items-center justify-center py-12 text-muted-foreground">
-                  <Lock className="w-5 h-5 mr-2" />
-                  Access Denied
-                </div>
-              ) : envVariables.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Key</TableHead>
-                      <TableHead>Value</TableHead>
-                      <TableHead className="w-[100px]">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {envVariables.map((env) => (
-                      <TableRow key={env.id}>
-                        <TableCell className="font-mono text-sm">{env.key}</TableCell>
-                        <TableCell className="font-mono text-sm">
-                          {visibleEnvVars.has(env.id)
-                            ? 'decrypted_value_here'
-                            : '••••••••••••••••'}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => toggleEnvVar(env.id)}
-                            >
-                              {visibleEnvVars.has(env.id) ? (
-                                <EyeOff className="w-4 h-4" />
-                              ) : (
-                                <Eye className="w-4 h-4" />
-                              )}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => copyToClipboard(env.key, 'Key')}
-                            >
-                              <Copy className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
               ) : (
                 <p className="text-muted-foreground">No environment variables configured.</p>
               )}
@@ -400,66 +352,7 @@ export default function ToolDetail() {
               )}
             </CardHeader>
             <CardContent>
-              {demoLogin ? (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-1">Username</p>
-                      <div className="flex items-center gap-2">
-                        <p className="font-mono">{demoLogin.username}</p>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() =>
-                            copyToClipboard(demoLogin.username, 'Username')
-                          }
-                        >
-                          <Copy className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-1">Password</p>
-                      <div className="flex items-center gap-2">
-                        <p className="font-mono">
-                          {showPassword ? 'demo_password_123' : '••••••••••••'}
-                        </p>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => setShowPassword(!showPassword)}
-                        >
-                          {showPassword ? (
-                            <EyeOff className="w-4 h-4" />
-                          ) : (
-                            <Eye className="w-4 h-4" />
-                          )}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() =>
-                            copyToClipboard('demo_password_123', 'Password')
-                          }
-                        >
-                          <Copy className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                  {demoLogin.notes && (
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-1">Notes</p>
-                      <p className="text-sm">{demoLogin.notes}</p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-muted-foreground">No demo login configured.</p>
-              )}
+              <p className="text-muted-foreground">No demo login configured.</p>
             </CardContent>
           </Card>
         </TabsContent>
@@ -474,7 +367,12 @@ export default function ToolDetail() {
               </Button>
             </CardHeader>
             <CardContent>
-              <KanbanBoard requests={requests} editable={isAdmin} toolFilter={tool.id} />
+              <KanbanBoard
+                requests={requests}
+                onRequestsChange={setRequests}
+                editable={isAdmin || isOwner}
+                toolFilter={tool.id}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -486,7 +384,7 @@ export default function ToolDetail() {
         onOpenChange={setChangeRequestDialogOpen}
         toolId={tool.id}
         toolName={tool.name}
-        onRequestSubmitted={handleChangeRequestSubmitted}
+        onRequestSubmitted={() => fetchToolData()}
       />
     </div>
   );
@@ -511,3 +409,4 @@ function Plus(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
