@@ -81,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     .from('users')
                     .select('*')
                     .eq('id', authUserId)
-                    .single()) as Promise<any>;
+                    .single()) as unknown as Promise<any>;
 
                 // Add 8 second timeout
                 const { data, error } = await withTimeout(
