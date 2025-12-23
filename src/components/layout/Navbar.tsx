@@ -46,8 +46,8 @@ export function Navbar() {
 
   const allNavItems = isAdmin ? [...navItems, ...adminNavItems] : navItems;
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/');
   };
 
