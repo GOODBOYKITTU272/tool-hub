@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { Resend } from "npm:resend@2.0.0"
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -24,6 +25,9 @@ serve(async (req) => {
                 },
             }
         )
+
+        // Initialize Resend client
+        const resend = new Resend(Deno.env.get('RESEND_API_KEY') ?? '')
 
         // 2. Get the requester's JWT and verify they are an Admin
         const authHeader = req.headers.get('Authorization')
@@ -81,12 +85,14 @@ serve(async (req) => {
             })
         }
 
-        // Invite the user via Supabase Auth Admin API
-        const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-            data: {
+        // Create user with Supabase Auth (without sending email)
+        const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.createUser({
+            email: email,
+            email_confirm: true, // Auto-confirm email
+            user_metadata: {
                 full_name: name,
                 role: role,
-                name: name // for compatibility
+                name: name
             },
         })
 
@@ -97,11 +103,7 @@ serve(async (req) => {
             })
         }
 
-        // Note: The public.users profile will be created automatically by the 'on_auth_user_created' 
-        // trigger in our supabase-schema.sql when the user accepts the invite (or upon creation depending on config).
-        // However, to ensure details like Role are set correctly, we'll manually upsert the profile.
-
-        // Attempt to upsert the profile to ensure role is correct
+        // Upsert the profile to ensure role is correct
         const { error: upsertError } = await supabaseAdmin
             .from('users')
             .upsert({
@@ -109,15 +111,124 @@ serve(async (req) => {
                 email: email,
                 name: name,
                 role: role,
-                must_change_password: false // Invitations handle their own flow
+                must_change_password: true // User needs to set password
             })
 
         if (upsertError) {
             console.error('Profile upsert error:', upsertError.message)
-            // We don't fail the whole request since the Auth user WAS created
         }
 
-        return new Response(JSON.stringify({ message: 'User invited successfully', user: inviteData.user }), {
+        // Generate password reset link
+        const { data: resetData, error: resetError } = await supabaseAdmin.auth.admin.generateLink({
+            type: 'recovery',
+            email: email,
+        })
+
+        if (resetError) {
+            console.error('Password reset link generation error:', resetError.message)
+            return new Response(JSON.stringify({ error: 'Failed to generate password reset link' }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 500,
+            })
+        }
+
+        // Send invitation email via Resend
+        const emailHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>You're Invited to Tool Hub</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+    <table role="presentation" style="width: 100%; border-collapse: collapse;">
+        <tr>
+            <td align="center" style="padding: 40px 0;">
+                <table role="presentation" style="width: 600px; max-width: 100%; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <!-- Header -->
+                    <tr>
+                        <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
+                            <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">Welcome to Tool Hub</h1>
+                        </td>
+                    </tr>
+                    
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px;">
+                            <p style="margin: 0 0 20px; font-size: 16px; line-height: 24px; color: #333333;">
+                                Hi <strong>${name}</strong>,
+                            </p>
+                            <p style="margin: 0 0 20px; font-size: 16px; line-height: 24px; color: #333333;">
+                                You've been invited to join <strong>Tool Hub</strong> as a <strong>${role}</strong>. 
+                                Click the button below to set up your password and get started.
+                            </p>
+                            
+                            <!-- CTA Button -->
+                            <table role="presentation" style="margin: 30px 0;">
+                                <tr>
+                                    <td align="center">
+                                        <a href="${resetData.properties.action_link}" 
+                                           style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                                            Set Up Your Password
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <p style="margin: 30px 0 20px; font-size: 14px; line-height: 20px; color: #666666;">
+                                If the button doesn't work, copy and paste this link into your browser:
+                            </p>
+                            <p style="margin: 0 0 20px; font-size: 14px; line-height: 20px; color: #667eea; word-break: break-all;">
+                                ${resetData.properties.action_link}
+                            </p>
+                            
+                            <p style="margin: 30px 0 0; font-size: 14px; line-height: 20px; color: #999999; border-top: 1px solid #eeeeee; padding-top: 20px;">
+                                This invitation link will expire in 24 hours. If you didn't expect this invitation, you can safely ignore this email.
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 20px 40px; text-align: center; background-color: #f9f9f9; border-radius: 0 0 8px 8px;">
+                            <p style="margin: 0; font-size: 12px; color: #999999;">
+                                © ${new Date().getFullYear()} Tool Hub. All rights reserved.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+        `
+
+        try {
+            const emailResult = await resend.emails.send({
+                from: 'Tool Hub <onboarding@resend.dev>',
+                to: email,
+                subject: `You're invited to join Tool Hub as ${role}`,
+                html: emailHtml,
+            })
+
+            console.log('Email sent successfully:', emailResult)
+        } catch (emailError: any) {
+            console.error('Resend email error:', emailError)
+            return new Response(JSON.stringify({
+                error: 'User created but failed to send invitation email',
+                details: emailError.message
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 500,
+            })
+        }
+
+        return new Response(JSON.stringify({
+            message: 'User invited successfully and email sent via Resend',
+            user: inviteData.user
+        }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200,
         })
