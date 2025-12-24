@@ -51,8 +51,21 @@ serve(async (req) => {
             .eq('id', user.id)
             .single()
 
+        // Debug logging
+        console.log('User ID:', user.id)
+        console.log('Profile Query Result:', profile)
+        console.log('Profile Query Error:', profileError)
+
         if (profileError || profile?.role !== 'Admin') {
-            return new Response(JSON.stringify({ error: 'Unauthorized: Admin access required' }), {
+            console.log('Authorization failed - profileError:', profileError?.message, 'role:', profile?.role)
+            return new Response(JSON.stringify({
+                error: 'Unauthorized: Admin access required',
+                debug: {
+                    hasProfileError: !!profileError,
+                    profileErrorMessage: profileError?.message,
+                    profileRole: profile?.role
+                }
+            }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 status: 403,
             })

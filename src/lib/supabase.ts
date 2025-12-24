@@ -9,7 +9,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Create Supabase client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     auth: {
         autoRefreshToken: true,
         persistSession: true,
@@ -19,8 +19,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     }
 });
 
-// Database types (will be auto-generated later)
-export type Database = {
+// Database types
+export type UserRole = 'Admin' | 'Owner' | 'Observer';
+
+export interface Database {
     public: {
         Tables: {
             users: {
@@ -28,13 +30,30 @@ export type Database = {
                     id: string;
                     email: string;
                     name: string;
-                    role: 'Admin' | 'Owner' | 'Observer';
+                    role: UserRole;
                     must_change_password: boolean;
                     created_at: string;
                     updated_at: string;
                 };
-                Insert: Omit<Database['public']['Tables']['users']['Row'], 'created_at' | 'updated_at'>;
-                Update: Partial<Database['public']['Tables']['users']['Insert']>;
+                Insert: {
+                    id?: string;
+                    email: string;
+                    name: string;
+                    role: UserRole;
+                    must_change_password?: boolean;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Update: {
+                    id?: string;
+                    email?: string;
+                    name?: string;
+                    role?: UserRole;
+                    must_change_password?: boolean;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Relationships: [];
             };
             tools: {
                 Row: {
@@ -53,8 +72,39 @@ export type Database = {
                     created_at: string;
                     updated_at: string;
                 };
-                Insert: Omit<Database['public']['Tables']['tools']['Row'], 'id' | 'created_at' | 'updated_at'>;
-                Update: Partial<Database['public']['Tables']['tools']['Insert']>;
+                Insert: {
+                    id?: string;
+                    name: string;
+                    description: string;
+                    category?: string | null;
+                    type?: string | null;
+                    tags?: string[] | null;
+                    url?: string | null;
+                    owner_id?: string | null;
+                    owner_team?: string | null;
+                    created_by: string;
+                    approved_by?: string | null;
+                    approval_status?: 'pending' | 'approved' | 'rejected';
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Update: {
+                    id?: string;
+                    name?: string;
+                    description?: string;
+                    category?: string | null;
+                    type?: string | null;
+                    tags?: string[] | null;
+                    url?: string | null;
+                    owner_id?: string | null;
+                    owner_team?: string | null;
+                    created_by?: string;
+                    approved_by?: string | null;
+                    approval_status?: 'pending' | 'approved' | 'rejected';
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Relationships: [];
             };
             requests: {
                 Row: {
@@ -67,8 +117,27 @@ export type Database = {
                     created_at: string;
                     updated_at: string;
                 };
-                Insert: Omit<Database['public']['Tables']['requests']['Row'], 'id' | 'created_at' | 'updated_at'>;
-                Update: Partial<Database['public']['Tables']['requests']['Insert']>;
+                Insert: {
+                    id?: string;
+                    tool_id: string;
+                    title: string;
+                    description: string;
+                    status: 'Requested' | 'In Progress' | 'Completed' | 'Rejected';
+                    created_by: string;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Update: {
+                    id?: string;
+                    tool_id?: string;
+                    title?: string;
+                    description?: string;
+                    status?: 'Requested' | 'In Progress' | 'Completed' | 'Rejected';
+                    created_by?: string;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Relationships: [];
             };
             audit_logs: {
                 Row: {
@@ -83,8 +152,31 @@ export type Database = {
                     after_state: any | null;
                     timestamp: string;
                 };
-                Insert: Omit<Database['public']['Tables']['audit_logs']['Row'], 'id' | 'timestamp'>;
-                Update: Partial<Database['public']['Tables']['audit_logs']['Insert']>;
+                Insert: {
+                    id?: string;
+                    user_id?: string | null;
+                    user_name?: string | null;
+                    user_email?: string | null;
+                    action: string;
+                    entity_type: string;
+                    entity_id?: string | null;
+                    before_state?: any | null;
+                    after_state?: any | null;
+                    timestamp?: string;
+                };
+                Update: {
+                    id?: string;
+                    user_id?: string | null;
+                    user_name?: string | null;
+                    user_email?: string | null;
+                    action?: string;
+                    entity_type?: string;
+                    entity_id?: string | null;
+                    before_state?: any | null;
+                    after_state?: any | null;
+                    timestamp?: string;
+                };
+                Relationships: [];
             };
             notifications: {
                 Row: {
@@ -97,9 +189,48 @@ export type Database = {
                     read: boolean;
                     created_at: string;
                 };
-                Insert: Omit<Database['public']['Tables']['notifications']['Row'], 'id' | 'created_at'>;
-                Update: Partial<Database['public']['Tables']['notifications']['Insert']>;
+                Insert: {
+                    id?: string;
+                    user_id: string;
+                    type: string;
+                    title: string;
+                    message: string;
+                    related_id?: string | null;
+                    read?: boolean;
+                    created_at?: string;
+                };
+                Update: {
+                    id?: string;
+                    user_id?: string;
+                    type?: string;
+                    title?: string;
+                    message?: string;
+                    related_id?: string | null;
+                    read?: boolean;
+                    created_at?: string;
+                };
+                Relationships: [
+                    {
+                        foreignKeyName: "notifications_user_id_fkey";
+                        columns: ["user_id"];
+                        isOneToOne: false;
+                        referencedRelation: "users";
+                        referencedColumns: ["id"];
+                    }
+                ];
             };
         };
+        Views: {
+            [_ in never]: never;
+        };
+        Functions: {
+            [_ in never]: never;
+        };
+        Enums: {
+            [_ in never]: never;
+        };
+        CompositeTypes: {
+            [_ in never]: never;
+        };
     };
-};
+}

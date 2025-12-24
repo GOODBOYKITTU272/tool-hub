@@ -25,14 +25,14 @@ export function useRealtimeSubscription(
         const channel = supabase
             .channel(`${table}-${event}-channel`)
             .on(
-                'postgres_changes',
+                'postgres_changes' as any,
                 {
                     event: event,
                     schema: 'public',
                     table: table,
                     filter: filter
                 },
-                (payload) => {
+                (payload: RealtimePostgresChangesPayload<any>) => {
                     console.log(`Real-time update on ${table}:`, payload.eventType, payload);
                     memoizedCallback(payload);
                 }
@@ -74,14 +74,14 @@ export function useMultipleRealtimeSubscriptions(
             const channel = supabase
                 .channel(`${table}-${event}-multi-channel`)
                 .on(
-                    'postgres_changes',
+                    'postgres_changes' as any,
                     {
                         event: event,
                         schema: 'public',
                         table: table,
                         filter: filter
                     },
-                    (payload) => {
+                    (payload: RealtimePostgresChangesPayload<any>) => {
                         console.log(`Real-time update on ${table}:`, payload.eventType);
                         callback(payload);
                     }
@@ -122,14 +122,14 @@ export function useNotificationSubscription(
         const channel = supabase
             .channel(`notifications-${userId}-channel`)
             .on(
-                'postgres_changes',
+                'postgres_changes' as any,
                 {
                     event: 'INSERT',
                     schema: 'public',
                     table: 'notifications',
                     filter: `user_id=eq.${userId}`
                 },
-                (payload) => {
+                (payload: RealtimePostgresChangesPayload<any>) => {
                     console.log(`New notification for user ${userId}:`, payload.new);
                     memoizedCallback(payload);
                 }
