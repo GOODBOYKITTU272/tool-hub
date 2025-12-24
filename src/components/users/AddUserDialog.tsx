@@ -16,8 +16,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Copy, Check, Terminal, Info } from 'lucide-react';
+import { Plus, MoreHorizontal, Edit, Trash2, Shield, Eye, Loader2, Copy, Check, Terminal, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/lib/supabase';
 
 interface AddUserDialogProps {
     open: boolean;
@@ -29,42 +30,73 @@ export function AddUserDialog({ open, onOpenChange, onSuccess }: AddUserDialogPr
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [role, setRole] = useState<'Admin' | 'Owner' | 'Observer'>('Observer');
-    const [isCopied, setIsCopied] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const { toast } = useToast();
 
-    const generateSQL = () => {
-        return `-- Run this in your Supabase SQL Editor to provision the user:
--- 1. Creates the user in Supabase Auth
--- 2. Your 'handle_new_user' trigger will automatically create the profile
+    const handleInvite = async () => {
+        if (!email || !name || !role) {
+            toast({
+                title: 'Missing Fields',
+                description: 'Please fill in all details before inviting.',
+                variant: 'destructive',
+            });
+            return;
+        }
 
--- NOTE: Since we don't have the user's password here, 
--- this SQL is slightly complex. The easiest way is to use the 
--- Supabase Dashboard > Authentication > Add User.
+        setIsLoading(true);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
 
--- ALTERNATIVE: Copy this email and use the Dashboard.
--- Email: ${email}
--- Role: ${role}
--- Name: ${name}
-`;
-    };
+            if (!session) throw new Error('No active session foundations');
 
-    const copyToClipboard = () => {
-        navigator.clipboard.writeText(email);
-        setIsCopied(true);
-        toast({
-            title: 'Email Copied',
-            description: 'You can now paste this into the Supabase Dashboard.',
-        });
-        setTimeout(() => setIsCopied(false), 2000);
+            // Call the invite-user Edge Function
+            const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/invite-user`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({ email, name, role }),
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Failed to send invitation');
+            }
+
+            toast({
+                title: 'Success!',
+                description: `An invitation email has been sent to ${email}.`,
+            });
+
+            onSuccess();
+            onOpenChange(false);
+
+            // Reset form
+            setName('');
+            setEmail('');
+            setRole('Observer');
+
+        } catch (error: any) {
+            console.error('Invitation error:', error);
+            toast({
+                title: 'Error',
+                description: error.message || 'Failed to send invitation. Make sure the Edge Function is deployed.',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
-                    <DialogTitle>Add New User</DialogTitle>
+                    <DialogTitle>Invite New User</DialogTitle>
                     <DialogDescription>
-                        Due to Supabase security restrictions, users must be invited or created via the Supabase Dashboard.
+                        Send an invitation email to a new team member. They will appear in the system once invited.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -77,26 +109,27 @@ export function AddUserDialog({ open, onOpenChange, onSuccess }: AddUserDialogPr
                                 placeholder="John Doe"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
+                                disabled={isLoading}
                             />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="email">Email Address</Label>
-                            <div className="flex gap-2">
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    placeholder="john@example.com"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                />
-                                <Button variant="outline" size="icon" onClick={copyToClipboard} disabled={!email}>
-                                    {isCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                                </Button>
-                            </div>
+                            <Input
+                                id="email"
+                                type="email"
+                                placeholder="john@example.com"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                disabled={isLoading}
+                            />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="role">Role</Label>
-                            <Select value={role} onValueChange={(val: any) => setRole(val)}>
+                            <Select
+                                value={role}
+                                onValueChange={(val: any) => setRole(val)}
+                                disabled={isLoading}
+                            >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select a role" />
                                 </SelectTrigger>
@@ -109,38 +142,27 @@ export function AddUserDialog({ open, onOpenChange, onSuccess }: AddUserDialogPr
                         </div>
                     </div>
 
-                    <div className="bg-slate-950 rounded-lg p-4 space-y-3 border border-slate-800">
-                        <div className="flex items-center gap-2 text-slate-400 text-sm">
-                            <Terminal className="h-4 w-4" />
-                            <span className="font-medium">Recommended Workflow</span>
-                        </div>
-                        <ol className="text-xs text-slate-300 space-y-2 list-decimal ml-4">
-                            <li>Open your <strong>Supabase Dashboard</strong></li>
-                            <li>Go to <strong>Authentication &gt; Users</strong></li>
-                            <li>Click <strong>Add User &gt; Create New User</strong></li>
-                            <li>Paste the email: <code className="text-pink-400 font-bold">{email || '...'}</code></li>
-                            <li>Set a temporary password</li>
-                            <li>The system will automatically sync their profile!</li>
-                        </ol>
-                    </div>
-
                     <div className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-100 rounded-lg text-blue-800 text-xs">
                         <Info className="h-4 w-4 mt-0.5 shrink-0" />
                         <p>
-                            Once created in the dashboard, the user's profile will appear in this list automatically thanks to our database triggers.
+                            The user will receive an email to set their password. Their profile will be created automatically.
                         </p>
                     </div>
                 </div>
 
                 <div className="flex justify-end gap-3">
-                    <Button variant="ghost" onClick={() => onOpenChange(false)}>
+                    <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isLoading}>
                         Cancel
                     </Button>
-                    <Button onClick={() => {
-                        onSuccess();
-                        onOpenChange(false);
-                    }}>
-                        I've Added the User
+                    <Button onClick={handleInvite} disabled={isLoading}>
+                        {isLoading ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Sending...
+                            </>
+                        ) : (
+                            'Send Invitation'
+                        )}
                     </Button>
                 </div>
             </DialogContent>
