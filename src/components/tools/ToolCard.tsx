@@ -25,16 +25,26 @@ export function ToolCard({ tool, variant = 'white' }: ToolCardProps) {
   return (
     <Card className={variantClasses[variant]}>
       <CardHeader className="pb-2">
-        <div className="flex items-start justify-between">
+        <div className="flex items-start justify-between gap-2">
           <h3 className="font-display font-bold text-lg">{tool.name}</h3>
-          {tool.approval_status === 'pending' && (
-            <Badge
-              variant={isLight ? 'secondary' : 'outline'}
-              className={!isLight ? 'border-current' : ''}
-            >
-              Pending
-            </Badge>
-          )}
+          <div className="flex-shrink-0">
+            {tool.approval_status === 'pending' && (
+              <Badge
+                variant="outline"
+                className="bg-yellow-500/10 text-yellow-700 border-yellow-500/30"
+              >
+                Pending
+              </Badge>
+            )}
+            {tool.approval_status === 'rejected' && (
+              <Badge
+                variant="outline"
+                className="bg-red-500/10 text-red-700 border-red-500/30"
+              >
+                Rejected
+              </Badge>
+            )}
+          </div>
         </div>
         <p className={`text-sm ${isLight ? 'text-muted-foreground' : 'opacity-80'}`}>
           {tool.owner_team || 'No team assigned'}

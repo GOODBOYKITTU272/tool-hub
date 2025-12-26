@@ -168,10 +168,18 @@ export function AddToolDialog({ open, onOpenChange, onToolAdded }: AddToolDialog
             // Call the callback to trigger refresh
             onToolAdded(data as any);
 
-            toast({
-                title: 'Tool added successfully!',
-                description: `${values.name} has been added to your tools.`,
-            });
+            // Show different toast based on approval status
+            if (isAdmin) {
+                toast({
+                    title: 'Tool added successfully!',
+                    description: `${values.name} has been added and is now visible to all users.`,
+                });
+            } else {
+                toast({
+                    title: 'Tool submitted for approval',
+                    description: `${values.name} is pending admin approval. You can view it in "My Tools" tab.`,
+                });
+            }
 
             // Reset form and close dialog
             form.reset();
