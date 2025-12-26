@@ -47,6 +47,8 @@ export default function Dashboard() {
     try {
       setLoading(true);
 
+      console.log('📊 [Dashboard] Fetching dashboard data...');
+
       // Fetch tools count and recent tools
       const { data: tools, error: toolsError } = await supabase
         .from('tools')
@@ -54,11 +56,12 @@ export default function Dashboard() {
         .order('created_at', { ascending: false });
 
       if (toolsError) {
+        console.error('❌ [Dashboard] Error fetching tools:', toolsError);
         if (toolsError.code === '42P01') {
           console.error('Error: "tools" table does not exist. Please run supabase-schema.sql');
-        } else {
-          throw toolsError;
         }
+      } else {
+        console.log('✅ [Dashboard] Fetched tools:', tools?.length || 0);
       }
 
       // Fetch requests count
@@ -67,24 +70,33 @@ export default function Dashboard() {
         .select('*');
 
       if (requestsError && requestsError.code !== '42P01') {
-        throw requestsError;
+        console.error('❌ [Dashboard] Error fetching requests:', requestsError);
+      } else {
+        console.log('✅ [Dashboard] Fetched requests:', requests?.length || 0);
       }
 
-      // Calculate stats based on real database records
-      const pending = requests?.filter(r => r.status === 'pending' || r.status === 'Requested').length || 0;
-      const completed = requests?.filter(r => r.status === 'completed' || r.status === 'Completed').length || 0;
+      // Calculate stats based on TOOLS approval status
+      const pendingTools = tools?.filter(t => t.approval_status === 'pending').length || 0;
+      const approvedTools = tools?.filter(t => t.approval_status === 'approved').length || 0;
+
+      console.log('📊 [Dashboard] Stats:', {
+        totalTools: tools?.length || 0,
+        pendingTools,
+        approvedTools,
+        totalRequests: requests?.length || 0,
+      });
 
       setStats({
         totalTools: tools?.length || 0,
         totalRequests: requests?.length || 0,
-        pending,
-        completed,
+        pending: pendingTools,      // Count pending TOOLS (not requests)
+        completed: approvedTools,   // Count approved TOOLS
       });
 
-      // Show top 3 tools on dashboard
+      // Show top 5 tools on dashboard
       setMyTools(tools?.slice(0, 5) || []);
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('❌ [Dashboard] Exception:', error);
     } finally {
       setLoading(false);
     }
@@ -135,13 +147,13 @@ export default function Dashboard() {
           variant="default"
         />
         <StatsCard
-          title="Pending"
+          title="Pending Approval"
           value={stats.pending}
           icon={Clock}
           variant="yellow"
         />
         <StatsCard
-          title="Completed"
+          title="Approved"
           value={stats.completed}
           icon={CheckCircle}
           variant="green"
