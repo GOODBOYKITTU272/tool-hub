@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -30,7 +30,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import { Tool, mockUsers } from '@/lib/mockData';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
 const toolFormSchema = z.object({
@@ -45,7 +45,7 @@ type ToolFormValues = z.infer<typeof toolFormSchema>;
 interface AddToolDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onToolAdded: (tool: Tool) => void;
+    onToolAdded: (tool: any) => void;
 }
 
 export function AddToolDialog({ open, onOpenChange, onToolAdded }: AddToolDialogProps) {
@@ -64,45 +64,85 @@ export function AddToolDialog({ open, onOpenChange, onToolAdded }: AddToolDialog
         },
     });
 
-    // Get list of owner users - Admin sees all, Owner sees only themselves
-    const ownerUsers = isAdmin
-        ? mockUsers.filter(u => u.role === 'Owner' || u.role === 'Admin')
-        : mockUsers.filter(u => u.id === currentUser?.id);
+    // Get list of owner users from Supabase
+    const [ownerUsers, setOwnerUsers] = useState<any[]>([]);
+
+    // Fetch owner users when dialog opens
+    useEffect(() => {
+        if (open) {
+            const fetchOwners = async () => {
+                const { data } = await supabase
+                    .from('users')
+                    .select('id, email, name, role')
+                    .in('role', ['Owner', 'Admin']);
+
+                if (data) {
+                    // Admin sees all owners, Owner sees only themselves
+                    const filtered = isAdmin ? data : data.filter(u => u.id === currentUser?.id);
+                    setOwnerUsers(filtered);
+                }
+            };
+            fetchOwners();
+        }
+    }, [open, isAdmin, currentUser?.id]);
 
     const onSubmit = async (values: ToolFormValues) => {
         setIsSubmitting(true);
 
-        // Simulate API call delay
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        try {
+            // Find selected owner
+            const selectedOwner = ownerUsers.find(u => u.email === values.ownerEmail);
 
-        // Find selected owner
-        const selectedOwner = mockUsers.find(u => u.email === values.ownerEmail);
+            // Insert tool into Supabase
+            const { data, error } = await supabase
+                .from('tools')
+                .insert({
+                    name: values.name,
+                    description: values.description,
+                    owner_id: selectedOwner?.id || currentUser?.id,
+                    owner_team: selectedOwner?.name || currentUser?.name,
+                    url: values.url || null,
+                    created_by: currentUser?.id,
+                    approval_status: 'approved', // Auto-approve for now
+                    category: null,
+                    type: null,
+                    tags: null,
+                })
+                .select()
+                .single();
 
-        // Create new tool object
-        const newTool: Tool = {
-            id: `tool-${Date.now()}`,
-            name: values.name,
-            description: values.description,
-            owner: selectedOwner?.name || 'Unknown',
-            ownerId: selectedOwner?.id || '',
-            url: values.url || undefined,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            requestCount: 0,
-        };
+            if (error) {
+                console.error('Error adding tool:', error);
+                toast({
+                    title: 'Error',
+                    description: 'Failed to add tool. Please try again.',
+                    variant: 'destructive',
+                });
+                setIsSubmitting(false);
+                return;
+            }
 
-        // Call the callback to add the tool
-        onToolAdded(newTool);
+            // Call the callback to trigger refresh
+            onToolAdded(data as any);
 
-        toast({
-            title: 'Tool added successfully!',
-            description: `${values.name} has been added to your tools.`,
-        });
+            toast({
+                title: 'Tool added successfully!',
+                description: `${values.name} has been added to your tools.`,
+            });
 
-        // Reset form and close dialog
-        form.reset();
-        onOpenChange(false);
-        setIsSubmitting(false);
+            // Reset form and close dialog
+            form.reset();
+            onOpenChange(false);
+        } catch (error) {
+            console.error('Exception adding tool:', error);
+            toast({
+                title: 'Error',
+                description: 'An unexpected error occurred.',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (

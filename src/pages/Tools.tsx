@@ -105,9 +105,18 @@ export default function Tools() {
     );
   };
 
-  const handleToolAdded = () => {
-    // Tool will be added via real-time subscription
+  const handleToolAdded = async () => {
+    // Close dialog first
     setDialogOpen(false);
+
+    // Manually refresh tools to ensure the new tool appears
+    // This provides a fallback in case real-time subscription is delayed or fails
+    await fetchTools();
+
+    toast({
+      title: 'Tool Added',
+      description: 'Your tool has been added successfully',
+    });
   };
 
   const handleRefresh = async () => {
