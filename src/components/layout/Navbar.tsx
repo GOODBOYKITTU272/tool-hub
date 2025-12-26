@@ -24,6 +24,7 @@ import {
   User,
   Menu,
   X,
+  CheckCircle,
 } from 'lucide-react';
 
 const navItems = [
@@ -33,6 +34,7 @@ const navItems = [
 ];
 
 const adminNavItems = [
+  { label: 'Pending Tools', href: '/pending-tools', icon: CheckCircle },
   { label: 'Users', href: '/users', icon: Users },
   { label: 'Audit Logs', href: '/audit-logs', icon: FileText },
 ];

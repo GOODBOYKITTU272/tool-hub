@@ -18,6 +18,7 @@ import ToolDetail from "./pages/ToolDetail";
 import Requests from "./pages/Requests";
 import Users from "./pages/Users";
 import AuditLogs from "./pages/AuditLogs";
+import PendingTools from "./pages/PendingTools";
 import NotFound from "./pages/NotFound";
 
 
@@ -64,6 +65,7 @@ const App = () => (
                 <Route path="/tools" element={<Tools />} />
                 <Route path="/tools/:id" element={<ToolDetail />} />
                 <Route path="/requests" element={<Requests />} />
+                <Route path="/pending-tools" element={<PendingTools />} />
                 <Route path="/users" element={<Users />} />
                 <Route path="/audit-logs" element={<AuditLogs />} />
               </Route>

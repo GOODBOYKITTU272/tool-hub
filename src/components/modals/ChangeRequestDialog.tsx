@@ -30,7 +30,24 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import { ChangeRequest } from '@/lib/mockData';
+
+// Change request interface
+interface ChangeRequest {
+    id: string;
+    toolId: string;
+    toolName: string;
+    changeType: 'copy' | 'config' | 'behavior' | 'access';
+    description: string;
+    urgency: 'low' | 'medium' | 'high';
+    attachmentUrl?: string;
+    requestedBy: string;
+    requestedByName: string;
+    status: 'pending' | 'approved' | 'rejected';
+    createdAt: string;
+    reviewedBy?: string;
+    reviewedAt?: string;
+    rejectionReason?: string;
+}
 
 const changeRequestSchema = z.object({
     changeType: z.enum(['copy', 'config', 'behavior', 'access'], {

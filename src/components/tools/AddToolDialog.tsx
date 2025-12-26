@@ -103,7 +103,7 @@ export function AddToolDialog({ open, onOpenChange, onToolAdded }: AddToolDialog
                     owner_team: selectedOwner?.name || currentUser?.name,
                     url: values.url || null,
                     created_by: currentUser?.id,
-                    approval_status: 'approved', // Auto-approve for now
+                    approval_status: isAdmin ? 'approved' : 'pending',
                     category: null,
                     type: null,
                     tags: null,
@@ -120,6 +120,28 @@ export function AddToolDialog({ open, onOpenChange, onToolAdded }: AddToolDialog
                 });
                 setIsSubmitting(false);
                 return;
+            }
+
+            // If tool is pending, send notifications to all admins
+            if (!isAdmin && data) {
+                // Fetch all admin users
+                const { data: adminUsers } = await supabase
+                    .from('users')
+                    .select('id')
+                    .eq('role', 'Admin');
+
+                if (adminUsers && adminUsers.length > 0) {
+                    // Create notifications for all admins
+                    const notifications = adminUsers.map(admin => ({
+                        user_id: admin.id,
+                        type: 'tool_pending_approval',
+                        title: 'New Tool Awaiting Approval',
+                        message: `${currentUser?.name} has submitted "${values.name}" for approval`,
+                        related_id: data.id,
+                    }));
+
+                    await supabase.from('notifications').insert(notifications);
+                }
             }
 
             // Call the callback to trigger refresh

@@ -23,12 +23,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import { Tool } from '@/lib/mockData';
+import { Database } from '@/lib/supabase';
+
+type Tool = Database['public']['Tables']['tools']['Row'];
 
 const toolFormSchema = z.object({
     name: z.string().min(3, 'Tool name must be at least 3 characters'),
     description: z.string().min(10, 'Description must be at least 10 characters'),
-    owner: z.string().min(2, 'Owner name is required'),
+    owner_team: z.string().min(2, 'Owner team is required'),
     url: z.string().url('Must be a valid URL').optional().or(z.literal('')),
 });
 
@@ -50,7 +52,7 @@ export function EditToolDialog({ open, onOpenChange, tool, onToolUpdated }: Edit
         defaultValues: {
             name: tool.name,
             description: tool.description,
-            owner: tool.owner,
+            owner_team: tool.owner_team || '',
             url: tool.url || '',
         },
     });
@@ -66,9 +68,9 @@ export function EditToolDialog({ open, onOpenChange, tool, onToolUpdated }: Edit
             ...tool,
             name: values.name,
             description: values.description,
-            owner: values.owner,
-            url: values.url || undefined,
-            updatedAt: new Date().toISOString(),
+            owner_team: values.owner_team,
+            url: values.url || null,
+            updated_at: new Date().toISOString(),
         };
 
         // Call the callback to update the tool
@@ -130,10 +132,10 @@ export function EditToolDialog({ open, onOpenChange, tool, onToolUpdated }: Edit
 
                         <FormField
                             control={form.control}
-                            name="owner"
+                            name="owner_team"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Owner</FormLabel>
+                                    <FormLabel>Owner Team</FormLabel>
                                     <FormControl>
                                         <Input placeholder="e.g., Engineering Team" {...field} />
                                     </FormControl>

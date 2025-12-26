@@ -92,9 +92,25 @@ export default function Tools() {
     }
   });
 
-  // Filter tools by ownership for Owner role
-  const myTools = tools.filter(tool => tool.owner_id === currentUser?.id || tool.created_by === currentUser?.id);
-  const allTools = tools;
+  // Filter tools by ownership and approval status
+  // Owners can see all their own tools (any status) + approved tools from others
+  // Admins can see all tools
+  // Observers can only see approved tools
+  const myTools = tools.filter(tool => {
+    const isMyTool = tool.owner_id === currentUser?.id || tool.created_by === currentUser?.id;
+    return isMyTool; // Owners see all their own tools regardless of status
+  });
+
+  const allTools = tools.filter(tool => {
+    // Admins see everything
+    if (isAdmin) return true;
+
+    // Check if it's user's own tool
+    const isMyTool = tool.owner_id === currentUser?.id || tool.created_by === currentUser?.id;
+
+    // Show own tools (any status) or approved tools from others
+    return isMyTool || tool.approval_status === 'approved';
+  });
 
   const filterTools = (toolList: Tool[]) => {
     return toolList.filter(
@@ -114,8 +130,10 @@ export default function Tools() {
     await fetchTools();
 
     toast({
-      title: 'Tool Added',
-      description: 'Your tool has been added successfully',
+      title: isAdmin ? 'Tool Added' : 'Tool Submitted',
+      description: isAdmin
+        ? 'Your tool has been added successfully'
+        : 'Your tool has been submitted for admin approval',
     });
   };
 
