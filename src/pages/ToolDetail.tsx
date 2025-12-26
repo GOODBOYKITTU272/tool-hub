@@ -2,6 +2,7 @@ import { useParams, Link } from 'react-router-dom';
 import { supabase, Database } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { ChangeRequestDialog } from '@/components/modals/ChangeRequestDialog';
+import { EditToolDialog } from '@/components/tools/EditToolDialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -35,6 +36,7 @@ export default function ToolDetail() {
   const [showPassword, setShowPassword] = useState(false);
   const [visibleEnvVars, setVisibleEnvVars] = useState<Set<string>>(new Set());
   const [changeRequestDialogOpen, setChangeRequestDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const { toast } = useToast();
   const { currentUser } = useAuth();
 
@@ -116,6 +118,14 @@ export default function ToolDetail() {
     });
   };
 
+  const handleToolUpdated = (updatedTool: Tool) => {
+    setTool(updatedTool);
+    toast({
+      title: 'Success',
+      description: 'Tool updated successfully',
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -168,7 +178,7 @@ export default function ToolDetail() {
           </Button>
         ) : (isAdmin || isOwner) ? (
           <div className="flex gap-2">
-            <Button variant="outline">
+            <Button variant="outline" onClick={() => setEditDialogOpen(true)}>
               <Edit className="w-4 h-4 mr-2" />
               Edit Tool
             </Button>
@@ -386,6 +396,16 @@ export default function ToolDetail() {
         toolName={tool.name}
         onRequestSubmitted={() => fetchToolData()}
       />
+
+      {/* Edit Tool Dialog */}
+      {tool && (
+        <EditToolDialog
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          tool={tool}
+          onToolUpdated={handleToolUpdated}
+        />
+      )}
     </div>
   );
 }

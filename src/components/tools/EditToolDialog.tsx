@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { Database } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 type Tool = Database['public']['Tables']['tools']['Row'];
 
@@ -60,29 +61,55 @@ export function EditToolDialog({ open, onOpenChange, tool, onToolUpdated }: Edit
     const onSubmit = async (values: ToolFormValues) => {
         setIsSubmitting(true);
 
-        // Simulate API call delay
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        try {
+            console.log('🔧 [EditTool] Updating tool:', tool.id);
 
-        // Update tool object
-        const updatedTool: Tool = {
-            ...tool,
-            name: values.name,
-            description: values.description,
-            owner_team: values.owner_team,
-            url: values.url || null,
-            updated_at: new Date().toISOString(),
-        };
+            // Update tool in Supabase
+            const { data, error } = await supabase
+                .from('tools')
+                .update({
+                    name: values.name,
+                    description: values.description,
+                    owner_team: values.owner_team,
+                    url: values.url || null,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', tool.id)
+                .select()
+                .single();
 
-        // Call the callback to update the tool
-        onToolUpdated(updatedTool);
+            if (error) {
+                console.error('❌ [EditTool] Error:', error);
+                toast({
+                    title: 'Error',
+                    description: error.message || 'Failed to update tool',
+                    variant: 'destructive',
+                });
+                setIsSubmitting(false);
+                return;
+            }
 
-        toast({
-            title: 'Tool updated successfully!',
-            description: `${values.name} has been updated.`,
-        });
+            console.log('✅ [EditTool] Tool updated successfully');
 
-        onOpenChange(false);
-        setIsSubmitting(false);
+            // Call the callback with updated data from database
+            onToolUpdated(data as Tool);
+
+            toast({
+                title: 'Tool updated successfully!',
+                description: `${values.name} has been updated.`,
+            });
+
+            onOpenChange(false);
+        } catch (error: any) {
+            console.error('❌ [EditTool] Exception:', error);
+            toast({
+                title: 'Error',
+                description: error.message || 'Failed to update tool',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
