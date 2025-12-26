@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { CheckCircle, XCircle, Calendar, User, ExternalLink } from 'lucide-react';
+import { CheckCircle, XCircle, Calendar, User, ExternalLink, Clock } from 'lucide-react';
 import { Database } from '@/lib/supabase';
+import { formatDistanceToNow } from 'date-fns';
 
 type Tool = Database['public']['Tables']['tools']['Row'];
 
@@ -64,10 +65,10 @@ export function ToolApprovalCard({ tool, onApprove, onReject, isRejected = false
                             <span className="font-medium">{tool.owner_team || 'N/A'}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Calendar className="w-4 h-4 text-muted-foreground" />
+                            <Clock className="w-4 h-4 text-muted-foreground" />
                             <span className="text-muted-foreground">Submitted:</span>
-                            <span className="font-medium">
-                                {new Date(tool.created_at).toLocaleDateString()}
+                            <span className="font-medium" title={new Date(tool.created_at).toLocaleString()}>
+                                {formatDistanceToNow(new Date(tool.created_at), { addSuffix: true })}
                             </span>
                         </div>
                     </div>

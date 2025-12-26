@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import {
   DropdownMenu,
@@ -43,10 +44,48 @@ export function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
   const { currentUser, logout } = useAuth();
   const isAdmin = currentUser?.role === 'Admin';
 
   const allNavItems = isAdmin ? [...navItems, ...adminNavItems] : navItems;
+
+  // Fetch pending tools count for admins
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    const fetchPendingCount = async () => {
+      const { count } = await supabase
+        .from('tools')
+        .select('*', { count: 'exact', head: true })
+        .eq('approval_status', 'pending');
+
+      setPendingCount(count || 0);
+    };
+
+    fetchPendingCount();
+
+    // Subscribe to real-time changes
+    const subscription = supabase
+      .channel('pending-tools-count')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tools',
+          filter: 'approval_status=eq.pending',
+        },
+        () => {
+          fetchPendingCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [isAdmin]);
 
   const handleLogout = async () => {
     await logout();
@@ -79,7 +118,7 @@ export function Navbar() {
                   key={item.href}
                   to={item.href}
                   className={cn(
-                    'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                    'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors relative',
                     isActive
                       ? 'bg-primary text-primary-foreground'
                       : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -87,6 +126,14 @@ export function Navbar() {
                 >
                   <Icon className="w-4 h-4" />
                   {item.label}
+                  {item.href === '/pending-tools' && isAdmin && pendingCount > 0 && (
+                    <Badge
+                      variant="destructive"
+                      className="ml-1 h-5 min-w-[20px] px-1 text-xs"
+                    >
+                      {pendingCount}
+                    </Badge>
+                  )}
                 </Link>
               );
             })}
@@ -179,6 +226,14 @@ export function Navbar() {
                   >
                     <Icon className="w-5 h-5" />
                     {item.label}
+                    {item.href === '/pending-tools' && isAdmin && pendingCount > 0 && (
+                      <Badge
+                        variant="destructive"
+                        className="ml-auto h-5 min-w-[20px] px-1 text-xs"
+                      >
+                        {pendingCount}
+                      </Badge>
+                    )}
                   </Link>
                 );
               })}

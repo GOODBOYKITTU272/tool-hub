@@ -4,7 +4,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ToolApprovalCard } from '@/components/tools/ToolApprovalCard';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2, RefreshCw, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Database } from '@/lib/supabase';
 
@@ -15,6 +17,8 @@ export default function PendingTools() {
     const [rejectedTools, setRejectedTools] = useState<Tool[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedOwner, setSelectedOwner] = useState('all');
     const { currentUser } = useAuth();
     const { toast } = useToast();
     const isAdmin = currentUser?.role === 'Admin';
@@ -246,6 +250,34 @@ export default function PendingTools() {
         }
     };
 
+    // Get unique owners from tools
+    const getUniqueOwners = (tools: Tool[]) => {
+        const owners = tools
+            .map(tool => tool.owner_team)
+            .filter((owner, index, self) => owner && self.indexOf(owner) === index);
+        return owners as string[];
+    };
+
+    // Filter tools based on search and owner selection
+    const filterTools = (tools: Tool[]) => {
+        return tools.filter(tool => {
+            // Filter by search query
+            const matchesSearch = !searchQuery ||
+                tool.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                tool.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (tool.owner_team && tool.owner_team.toLowerCase().includes(searchQuery.toLowerCase()));
+
+            // Filter by selected owner
+            const matchesOwner = selectedOwner === 'all' || tool.owner_team === selectedOwner;
+
+            return matchesSearch && matchesOwner;
+        });
+    };
+
+    const filteredPendingTools = filterTools(pendingTools);
+    const filteredRejectedTools = filterTools(rejectedTools);
+    const uniqueOwners = getUniqueOwners([...pendingTools, ...rejectedTools]);
+
     if (!isAdmin) {
         return (
             <div className="space-y-6 animate-fade-in">
@@ -280,6 +312,32 @@ export default function PendingTools() {
                 </div>
             </div>
 
+            {/* Search and Filter */}
+            <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Search by name, description, or owner..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10"
+                    />
+                </div>
+                <Select value={selectedOwner} onValueChange={setSelectedOwner}>
+                    <SelectTrigger className="w-full sm:w-[200px]">
+                        <SelectValue placeholder="Filter by owner" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Owners</SelectItem>
+                        {uniqueOwners.map((owner) => (
+                            <SelectItem key={owner} value={owner}>
+                                {owner}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+
             {/* Loading State */}
             {loading ? (
                 <div className="flex items-center justify-center py-12">
@@ -289,17 +347,17 @@ export default function PendingTools() {
                 <Tabs defaultValue="pending" className="w-full">
                     <TabsList>
                         <TabsTrigger value="pending">
-                            Pending ({pendingTools.length})
+                            Pending ({filteredPendingTools.length})
                         </TabsTrigger>
                         <TabsTrigger value="rejected">
-                            Rejected ({rejectedTools.length})
+                            Rejected ({filteredRejectedTools.length})
                         </TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="pending" className="mt-6">
-                        {pendingTools.length > 0 ? (
+                        {filteredPendingTools.length > 0 ? (
                             <div className="grid grid-cols-1 gap-4">
-                                {pendingTools.map((tool) => (
+                                {filteredPendingTools.map((tool) => (
                                     <ToolApprovalCard
                                         key={tool.id}
                                         tool={tool}
@@ -310,15 +368,17 @@ export default function PendingTools() {
                             </div>
                         ) : (
                             <div className="text-center py-12 text-muted-foreground">
-                                No pending tools to review
+                                {searchQuery || selectedOwner !== 'all'
+                                    ? 'No tools match your filters'
+                                    : 'No pending tools to review'}
                             </div>
                         )}
                     </TabsContent>
 
                     <TabsContent value="rejected" className="mt-6">
-                        {rejectedTools.length > 0 ? (
+                        {filteredRejectedTools.length > 0 ? (
                             <div className="grid grid-cols-1 gap-4">
-                                {rejectedTools.map((tool) => (
+                                {filteredRejectedTools.map((tool) => (
                                     <ToolApprovalCard
                                         key={tool.id}
                                         tool={tool}
@@ -330,7 +390,9 @@ export default function PendingTools() {
                             </div>
                         ) : (
                             <div className="text-center py-12 text-muted-foreground">
-                                No rejected tools
+                                {searchQuery || selectedOwner !== 'all'
+                                    ? 'No tools match your filters'
+                                    : 'No rejected tools'}
                             </div>
                         )}
                     </TabsContent>
