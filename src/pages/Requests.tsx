@@ -14,6 +14,8 @@ import {
 import { Plus, Loader2 } from 'lucide-react';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { useToast } from '@/hooks/use-toast';
+import { RequestFilters, FilterState } from '@/components/requests/RequestFilters';
+import { BulkActionBar } from '@/components/requests/BulkActionBar';
 
 interface Request {
   id: string;
@@ -30,6 +32,12 @@ export default function Requests() {
   const [toolFilter, setToolFilter] = useState<string>('all');
   const [requests, setRequests] = useState<Request[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState<FilterState>({
+    status: 'all',
+    dateRange: 'all',
+    search: '',
+  });
+  const [selectedRequests, setSelectedRequests] = useState<Set<string>>(new Set());
   const { currentUser } = useAuth();
   const { toast } = useToast();
   const isOwner = currentUser?.role === 'Owner';
@@ -81,6 +89,90 @@ export default function Requests() {
     ? allRequests
     : allRequests.filter(r => r.tool_id === toolFilter);
 
+  // Apply filters
+  const filteredRequests = filteredByTool.filter(r => {
+    // Status filter
+    if (filters.status !== 'all' && r.status !== filters.status) {
+      return false;
+    }
+
+    // Date range filter
+    if (filters.dateRange !== 'all') {
+      const requestDate = new Date(r.created_at);
+      const now = new Date();
+      const diffDays = Math.floor((now.getTime() - requestDate.getTime()) / (1000 * 60 * 60 * 24));
+
+      switch (filters.dateRange) {
+        case 'today':
+          if (diffDays > 0) return false;
+          break;
+        case 'week':
+          if (diffDays > 7) return false;
+          break;
+        case 'month':
+          if (diffDays > 30) return false;
+          break;
+        case '3months':
+          if (diffDays > 90) return false;
+          break;
+      }
+    }
+
+    // Search filter
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      return (
+        r.title.toLowerCase().includes(searchLower) ||
+        r.description.toLowerCase().includes(searchLower)
+      );
+    }
+
+    return true;
+  });
+
+  // Bulk action handlers
+  const handleBulkMarkInProgress = async () => {
+    try {
+      const updates = Array.from(selectedRequests).map(id =>
+        supabase.from('requests').update({ status: 'In Progress' }).eq('id', id)
+      );
+      await Promise.all(updates);
+      toast({ title: 'Success', description: `${selectedRequests.size} requests marked as In Progress` });
+      setSelectedRequests(new Set());
+      fetchRequests();
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to update requests', variant: 'destructive' });
+    }
+  };
+
+  const handleBulkMarkCompleted = async () => {
+    try {
+      const updates = Array.from(selectedRequests).map(id =>
+        supabase.from('requests').update({ status: 'Completed' }).eq('id', id)
+      );
+      await Promise.all(updates);
+      toast({ title: 'Success', description: `${selectedRequests.size} requests marked as Completed` });
+      setSelectedRequests(new Set());
+      fetchRequests();
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to update requests', variant: 'destructive' });
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      const deletes = Array.from(selectedRequests).map(id =>
+        supabase.from('requests').delete().eq('id', id)
+      );
+      await Promise.all(deletes);
+      toast({ title: 'Success', description: `${selectedRequests.size} requests deleted` });
+      setSelectedRequests(new Set());
+      fetchRequests();
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to delete requests', variant: 'destructive' });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -116,8 +208,24 @@ export default function Requests() {
         </div>
       </div>
 
+      {/* Filters */}
+      <RequestFilters
+        filters={filters}
+        onFiltersChange={setFilters}
+        onClearFilters={() => setFilters({ status: 'all', dateRange: 'all', search: '' })}
+      />
+
+      {/* Bulk Actions Bar */}
+      <BulkActionBar
+        selectedCount={selectedRequests.size}
+        onMarkInProgress={handleBulkMarkInProgress}
+        onMarkCompleted={handleBulkMarkCompleted}
+        onDelete={handleBulkDelete}
+        onClearSelection={() => setSelectedRequests(new Set())}
+      />
+
       <KanbanBoard
-        requests={filteredByTool}
+        requests={filteredRequests}
         onRequestsChange={setRequests}
       />
     </div>
