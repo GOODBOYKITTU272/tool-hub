@@ -131,7 +131,7 @@ export function AddToolDialog({ open, onOpenChange, onToolAdded }: AddToolDialog
                     .eq('role', 'Admin');
 
                 if (adminUsers && adminUsers.length > 0) {
-                    // Create notifications for all admins
+                    // Create in-app notifications for all admins
                     const notifications = adminUsers.map(admin => ({
                         user_id: admin.id,
                         type: 'tool_pending_approval',
@@ -141,6 +141,27 @@ export function AddToolDialog({ open, onOpenChange, onToolAdded }: AddToolDialog
                     }));
 
                     await supabase.from('notifications').insert(notifications);
+
+                    // Send email notifications to admins via edge function
+                    try {
+                        const { data: { session } } = await supabase.auth.getSession();
+                        await supabase.functions.invoke('notify-tool-submission', {
+                            body: {
+                                toolId: data.id,
+                                toolName: values.name,
+                                toolDescription: values.description,
+                                ownerName: currentUser?.name,
+                                ownerEmail: currentUser?.email,
+                            },
+                            headers: {
+                                Authorization: `Bearer ${session?.access_token}`,
+                            },
+                        });
+                        console.log('Email notifications sent to admins');
+                    } catch (emailError) {
+                        console.error('Failed to send email notifications:', emailError);
+                        // Don't block the flow if email fails
+                    }
                 }
             }
 

@@ -108,6 +108,7 @@ export default function PendingTools() {
 
             // Send notification to tool owner
             if (tool?.created_by) {
+                // Create in-app notification
                 await supabase.from('notifications').insert({
                     user_id: tool.created_by,
                     type: 'tool_approved',
@@ -115,6 +116,36 @@ export default function PendingTools() {
                     message: `Your tool "${tool.name}" has been approved by an admin`,
                     related_id: toolId,
                 });
+
+                // Send email notification via edge function
+                try {
+                    // Fetch owner details for email
+                    const { data: owner } = await supabase
+                        .from('users')
+                        .select('email, name')
+                        .eq('id', tool.created_by)
+                        .single();
+
+                    if (owner) {
+                        const { data: { session } } = await supabase.auth.getSession();
+                        await supabase.functions.invoke('notify-tool-decision', {
+                            body: {
+                                toolId: toolId,
+                                toolName: tool.name,
+                                decision: 'approved',
+                                ownerEmail: owner.email,
+                                ownerName: owner.name,
+                            },
+                            headers: {
+                                Authorization: `Bearer ${session?.access_token}`,
+                            },
+                        });
+                        console.log('Approval email sent to tool owner');
+                    }
+                } catch (emailError) {
+                    console.error('Failed to send approval email:', emailError);
+                    // Don't block the flow if email fails
+                }
             }
 
             toast({
@@ -162,6 +193,7 @@ export default function PendingTools() {
                     ? `Your tool "${tool.name}" was rejected. Reason: ${reason}`
                     : `Your tool "${tool.name}" was rejected by an admin`;
 
+                // Create in-app notification
                 await supabase.from('notifications').insert({
                     user_id: tool.created_by,
                     type: 'tool_rejected',
@@ -169,6 +201,37 @@ export default function PendingTools() {
                     message: message,
                     related_id: toolId,
                 });
+
+                // Send email notification via edge function
+                try {
+                    // Fetch owner details for email
+                    const { data: owner } = await supabase
+                        .from('users')
+                        .select('email, name')
+                        .eq('id', tool.created_by)
+                        .single();
+
+                    if (owner) {
+                        const { data: { session } } = await supabase.auth.getSession();
+                        await supabase.functions.invoke('notify-tool-decision', {
+                            body: {
+                                toolId: toolId,
+                                toolName: tool.name,
+                                decision: 'rejected',
+                                ownerEmail: owner.email,
+                                ownerName: owner.name,
+                                rejectionReason: reason || undefined,
+                            },
+                            headers: {
+                                Authorization: `Bearer ${session?.access_token}`,
+                            },
+                        });
+                        console.log('Rejection email sent to tool owner');
+                    }
+                } catch (emailError) {
+                    console.error('Failed to send rejection email:', emailError);
+                    // Don't block the flow if email fails
+                }
             }
 
             toast({
