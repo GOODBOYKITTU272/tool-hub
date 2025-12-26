@@ -93,6 +93,22 @@ export function AddToolDialog({ open, onOpenChange, onToolAdded }: AddToolDialog
             // Find selected owner
             const selectedOwner = ownerUsers.find(u => u.email === values.ownerEmail);
 
+            // Log user info for debugging
+            console.log('🔧 [AddTool] Current user:', {
+                id: currentUser?.id,
+                email: currentUser?.email,
+                name: currentUser?.name,
+                role: currentUser?.role,
+                isAdmin,
+            });
+
+            console.log('🔧 [AddTool] Attempting to insert tool:', {
+                name: values.name,
+                owner_id: selectedOwner?.id || currentUser?.id,
+                created_by: currentUser?.id,
+                approval_status: isAdmin ? 'approved' : 'pending',
+            });
+
             // Insert tool into Supabase
             const { data, error } = await supabase
                 .from('tools')
@@ -112,10 +128,29 @@ export function AddToolDialog({ open, onOpenChange, onToolAdded }: AddToolDialog
                 .single();
 
             if (error) {
-                console.error('Error adding tool:', error);
+                // Detailed error logging
+                console.error('❌ [AddTool] Supabase error details:', {
+                    message: error.message,
+                    code: error.code,
+                    details: error.details,
+                    hint: error.hint,
+                    fullError: error,
+                });
+
+                // Check for specific error types
+                let errorMessage = 'Failed to add tool. Please try again.';
+
+                if (error.code === '42501' || error.message?.toLowerCase().includes('policy')) {
+                    errorMessage = `Permission denied: You need Admin or Owner role to add tools. Your current role: ${currentUser?.role || 'Unknown'}`;
+                } else if (error.code === 'PGRST116') {
+                    errorMessage = 'Row level security policy violation. Please check your permissions.';
+                } else if (error.message) {
+                    errorMessage = `Error: ${error.message}`;
+                }
+
                 toast({
                     title: 'Error',
-                    description: 'Failed to add tool. Please try again.',
+                    description: errorMessage,
                     variant: 'destructive',
                 });
                 setIsSubmitting(false);
