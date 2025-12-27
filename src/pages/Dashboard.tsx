@@ -77,8 +77,20 @@ export default function Dashboard() {
         console.log('✅ [Dashboard] Fetched requests:', requests?.length || 0);
       }
 
-      // Calculate stats based on TOOLS approval status
-      const pendingTools = tools?.filter(t => t.approval_status === 'pending').length || 0;
+      // Calculate stats based on TOOLS approval status and user role
+      let pendingTools = 0;
+
+      if (isAdmin) {
+        // Admin sees ALL pending tools
+        pendingTools = tools?.filter(t => t.approval_status === 'pending').length || 0;
+      } else if (isOwner) {
+        // Owner sees ONLY their own pending tools
+        pendingTools = tools?.filter(t =>
+          t.approval_status === 'pending' && t.created_by === currentUser?.id
+        ).length || 0;
+      }
+      // Observers: pendingTools stays 0
+
       const approvedTools = tools?.filter(t => t.approval_status === 'approved').length || 0;
 
       console.log('📊 [Dashboard] Stats:', {
@@ -86,19 +98,33 @@ export default function Dashboard() {
         pendingTools,
         approvedTools,
         totalRequests: requests?.length || 0,
+        userRole: currentUser?.role,
       });
 
       setStats({
         totalTools: tools?.length || 0,
         totalRequests: requests?.length || 0,
-        pending: pendingTools,      // Count pending TOOLS (not requests)
+        pending: pendingTools,      // Role-based pending count
         completed: approvedTools,   // Count approved TOOLS
       });
 
 
 
-      // Show top 5 tools on dashboard
-      setMyTools(tools?.slice(0, 5) || []);
+
+
+      // Filter tools by ownership and role before showing on dashboard
+      const userTools = tools?.filter(tool => {
+        const isMyTool = tool.owner_id === currentUser?.id || tool.created_by === currentUser?.id;
+
+        if (isAdmin) return true; // Admin sees all tools
+        if (isOwner) return isMyTool; // Owner sees only their own tools
+
+        // Observer sees only approved tools
+        return tool.approval_status === 'approved';
+      }) || [];
+
+      // Show top 5 tools relevant to the user
+      setMyTools(userTools.slice(0, 5));
     } catch (error) {
       console.error('❌ [Dashboard] Exception:', error);
     } finally {
