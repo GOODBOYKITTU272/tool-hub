@@ -215,7 +215,7 @@ export default function DailyJournal() {
                         <TabsList className="grid w-full grid-cols-2">
                             <TabsTrigger value="form">
                                 <CalendarIcon className="w-4 h-4 mr-2" />
-                                {selectedLog ? 'Edit Log' : 'New Log'}
+                                New Log
                             </TabsTrigger>
                             <TabsTrigger value="view" disabled={selectedDateLogs.length === 0}>
                                 <TrendingUp className="w-4 h-4 mr-2" />
