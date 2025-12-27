@@ -46,7 +46,7 @@ export default function Users() {
       const { data, error } = await supabase
         .from('users')
         .select('*')
-        .order('name');
+        .order('created_at', { ascending: false });
 
       if (error) {
         if (error.code !== '42P01') throw error;
@@ -138,16 +138,20 @@ export default function Users() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[60px]">#</TableHead>
                   <TableHead>User</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead>Created</TableHead>
+                  <TableHead>Last Login</TableHead>
                   <TableHead className="w-[70px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((user) => (
+                {users.map((user, index) => (
                   <TableRow key={user.id}>
+                    <TableCell className="font-medium text-muted-foreground">
+                      {index + 1}
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="h-9 w-9">
@@ -182,7 +186,9 @@ export default function Users() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {user.created_at ? format(new Date(user.created_at), 'MMM d, yyyy') : 'N/A'}
+                      {user.created_at
+                        ? format(new Date(user.created_at), 'MMM d, yyyy h:mm a')
+                        : 'Never'}
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>

@@ -54,7 +54,7 @@ export function NotificationBell() {
                             >
                                 <div className="flex items-start justify-between w-full">
                                     <p className="font-medium text-sm">{notification.title}</p>
-                                    {!notification.read && (
+                                    {!notification.is_read && (
                                         <div className="h-2 w-2 rounded-full bg-blue-500 mt-1" />
                                     )}
                                 </div>
@@ -65,8 +65,18 @@ export function NotificationBell() {
                             </DropdownMenuItem>
                         ))}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-center justify-center text-sm text-primary">
-                            View all notifications
+                        <DropdownMenuItem
+                            className="text-center justify-center text-sm text-primary cursor-pointer"
+                            onClick={async () => {
+                                // Mark all user notifications as read
+                                for (const notification of userNotifications) {
+                                    if (!notification.is_read) {
+                                        await markAsRead(notification.id);
+                                    }
+                                }
+                            }}
+                        >
+                            Mark all as read
                         </DropdownMenuItem>
                     </>
                 ) : (
