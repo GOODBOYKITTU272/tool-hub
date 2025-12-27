@@ -183,7 +183,35 @@ export default function ToolDetail() {
               Edit Tool
             </Button>
             {isAdmin && (
-              <Button variant="destructive">
+              <Button
+                variant="destructive"
+                onClick={async () => {
+                  if (confirm(`Are you sure you want to delete "${tool.name}"? This action cannot be undone.`)) {
+                    try {
+                      const { error } = await supabase
+                        .from('tools')
+                        .delete()
+                        .eq('id', tool.id);
+
+                      if (error) throw error;
+
+                      toast({
+                        title: 'Success',
+                        description: 'Tool deleted successfully',
+                      });
+
+                      window.location.href = '/tools';
+                    } catch (error) {
+                      console.error('Error deleting tool:', error);
+                      toast({
+                        title: 'Error',
+                        description: 'Failed to delete tool',
+                        variant: 'destructive'
+                      });
+                    }
+                  }
+                }}
+              >
                 <Trash2 className="w-4 h-4 mr-2" />
                 Delete
               </Button>
