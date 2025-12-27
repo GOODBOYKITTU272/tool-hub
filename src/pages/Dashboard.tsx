@@ -6,8 +6,6 @@ import { ToolCard } from '@/components/tools/ToolCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { OwnerMetricsCard } from '@/components/dashboard/OwnerMetricsCard';
-import { QuickActionsCard } from '@/components/dashboard/QuickActionsCard';
 import {
   Wrench,
   MessageSquare,
@@ -27,13 +25,7 @@ interface DashboardStats {
   completed: number;
 }
 
-interface OwnerMetrics {
-  myToolsCount: number;
-  myPendingTools: number;
-  myApprovedTools: number;
-  requestsThisMonth: number;
-  mostRequestedTool: { name: string; count: number } | null;
-}
+
 
 type Tool = Database['public']['Tables']['tools']['Row'];
 
@@ -42,13 +34,6 @@ const toolVariants: ('blue' | 'green' | 'white')[] = ['blue', 'green', 'white', 
 export default function Dashboard() {
   const { currentUser } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({ totalTools: 0, totalRequests: 0, pending: 0, completed: 0 });
-  const [ownerMetrics, setOwnerMetrics] = useState<OwnerMetrics>({
-    myToolsCount: 0,
-    myPendingTools: 0,
-    myApprovedTools: 0,
-    requestsThisMonth: 0,
-    mostRequestedTool: null,
-  });
   const [myTools, setMyTools] = useState<Tool[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -110,47 +95,7 @@ export default function Dashboard() {
         completed: approvedTools,   // Count approved TOOLS
       });
 
-      // Calculate owner-specific metrics
-      if (isOwner && currentUser) {
-        const myTools = tools?.filter(t => t.created_by === currentUser.id || t.owner_id === currentUser.id) || [];
-        const myPending = myTools.filter(t => t.approval_status === 'pending').length;
-        const myApproved = myTools.filter(t => t.approval_status === 'approved').length;
 
-        // Requests this month on owner's tools
-        const now = new Date();
-        const myToolIds = myTools.map(t => t.id);
-        const requestsThisMonth = requests?.filter(r => {
-          const requestDate = new Date(r.created_at);
-          return myToolIds.includes(r.tool_id) &&
-            requestDate.getMonth() === now.getMonth() &&
-            requestDate.getFullYear() === now.getFullYear();
-        }).length || 0;
-
-        // Calculate most requested tool
-        const toolRequestCounts: Record<string, number> = {};
-        const myRequestsOnMyTools = requests?.filter(r => myToolIds.includes(r.tool_id)) || [];
-        myRequestsOnMyTools.forEach(r => {
-          toolRequestCounts[r.tool_id] = (toolRequestCounts[r.tool_id] || 0) + 1;
-        });
-
-        let mostRequestedTool = null;
-        if (Object.keys(toolRequestCounts).length > 0) {
-          const [toolId, count] = Object.entries(toolRequestCounts)
-            .sort(([, a], [, b]) => b - a)[0];
-          const tool = myTools.find(t => t.id === toolId);
-          if (tool) {
-            mostRequestedTool = { name: tool.name, count };
-          }
-        }
-
-        setOwnerMetrics({
-          myToolsCount: myTools.length,
-          myPendingTools: myPending,
-          myApprovedTools: myApproved,
-          requestsThisMonth,
-          mostRequestedTool,
-        });
-      }
 
       // Show top 5 tools on dashboard
       setMyTools(tools?.slice(0, 5) || []);
@@ -198,38 +143,31 @@ export default function Dashboard() {
           value={stats.totalTools}
           icon={Wrench}
           variant="blue"
+          href="/tools"
         />
         <StatsCard
           title="Total Requests"
           value={stats.totalRequests}
           icon={MessageSquare}
           variant="default"
+          href="/requests"
         />
         <StatsCard
           title="Pending Approval"
           value={stats.pending}
           icon={Clock}
           variant="yellow"
+          href={isAdmin ? "/pending-tools" : "/tools"}
         />
         <StatsCard
           title="Approved"
           value={stats.completed}
           icon={CheckCircle}
           variant="green"
+          href="/tools"
         />
       </div>
 
-      {/* Owner-Specific Section */}
-      {isOwner && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2">
-            <OwnerMetricsCard metrics={ownerMetrics} />
-          </div>
-          <div>
-            <QuickActionsCard requestCount={stats.totalRequests} />
-          </div>
-        </div>
-      )}
 
       {/* Quick Access Tools */}
       <section>

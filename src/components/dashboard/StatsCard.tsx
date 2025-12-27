@@ -1,12 +1,14 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Link } from 'react-router-dom';
 
 interface StatsCardProps {
   title: string;
   value: number | string;
   icon: LucideIcon;
   variant?: 'default' | 'blue' | 'green' | 'yellow' | 'pink';
+  href?: string;
 }
 
 const variantClasses = {
@@ -25,9 +27,13 @@ const iconVariantClasses = {
   pink: 'bg-white/20 text-current',
 };
 
-export function StatsCard({ title, value, icon: Icon, variant = 'default' }: StatsCardProps) {
-  return (
-    <Card className={cn('transition-all duration-200 hover:scale-[1.02]', variantClasses[variant])}>
+export function StatsCard({ title, value, icon: Icon, variant = 'default', href }: StatsCardProps) {
+  const content = (
+    <Card className={cn(
+      'transition-all duration-200',
+      href ? 'hover:scale-[1.02] hover:shadow-md cursor-pointer' : 'hover:scale-[1.02]',
+      variantClasses[variant]
+    )}>
       <CardContent className="p-6">
         <div className="flex items-center justify-between">
           <div>
@@ -43,4 +49,10 @@ export function StatsCard({ title, value, icon: Icon, variant = 'default' }: Sta
       </CardContent>
     </Card>
   );
+
+  if (href) {
+    return <Link to={href}>{content}</Link>;
+  }
+
+  return content;
 }
