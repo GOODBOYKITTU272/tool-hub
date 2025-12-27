@@ -199,7 +199,7 @@ serve(async (req) => {
         // Send email to the tool owner
         try {
             const result = await resend.emails.send({
-                from: 'Tool Hub <onboarding@resend.dev>',
+                from: 'Tool Hub <support@applywizzae.in>',
                 to: ownerEmail,
                 subject: subject,
                 html: emailHtml,

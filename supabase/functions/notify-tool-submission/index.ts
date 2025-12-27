@@ -143,7 +143,7 @@ serve(async (req) => {
         const emailPromises = adminUsers.map(async (admin) => {
             try {
                 const result = await resend.emails.send({
-                    from: 'Tool Hub <onboarding@resend.dev>',
+                    from: 'Tool Hub <support@applywizzae.in>',
                     to: admin.email,
                     subject: `New Tool Awaiting Approval: ${toolName}`,
                     html: emailHtml,
