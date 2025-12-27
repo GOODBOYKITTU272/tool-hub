@@ -19,7 +19,7 @@ export function NotificationBell() {
 
     // Filter notifications for current user
     const userNotifications = notifications
-        .filter((n) => n.userId === currentUser?.id)
+        .filter((n) => n.user_id === currentUser?.id)
         .slice(0, 5); // Show only 5 most recent
 
     const handleNotificationClick = (notificationId: string) => {
@@ -60,7 +60,7 @@ export function NotificationBell() {
                                 </div>
                                 <p className="text-xs text-muted-foreground">{notification.message}</p>
                                 <p className="text-xs text-muted-foreground">
-                                    {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+                                    {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
                                 </p>
                             </DropdownMenuItem>
                         ))}
