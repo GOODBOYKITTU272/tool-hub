@@ -101,17 +101,6 @@ export default function Dashboard() {
         userRole: currentUser?.role,
       });
 
-      setStats({
-        totalTools: tools?.length || 0,
-        totalRequests: requests?.length || 0,
-        pending: pendingTools,      // Role-based pending count
-        completed: approvedTools,   // Count approved TOOLS
-      });
-
-
-
-
-
       // Filter tools by ownership and role before showing on dashboard
       const userTools = tools?.filter(tool => {
         const isMyTool = tool.owner_id === currentUser?.id || tool.created_by === currentUser?.id;
@@ -122,6 +111,20 @@ export default function Dashboard() {
         // Observer sees only approved tools
         return tool.approval_status === 'approved';
       }) || [];
+
+      // Calculate Total Tools = ONLY APPROVED tools (not pending)
+      const approvedUserTools = userTools.filter(tool => tool.approval_status === 'approved');
+      const totalToolsCount = isAdmin
+        ? approvedTools  // Admin sees all approved tools count
+        : approvedUserTools.length;  // Owner/Observer sees their approved tools count
+
+      setStats({
+        totalTools: totalToolsCount,  // Only approved tools (NOT pending)
+        totalRequests: requests?.length || 0,
+        pending: pendingTools,      // Pending tools shown separately
+        completed: approvedTools,   // Count approved TOOLS
+      });
+
 
       // Show top 5 tools relevant to the user
       setMyTools(userTools.slice(0, 5));
