@@ -119,7 +119,7 @@ export function AddUserDialog({ open, onOpenChange, onSuccess }: AddUserDialogPr
                                 type="email"
                                 placeholder="john@example.com"
                                 value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                onChange={(e) => setEmail(e.target.value.toLowerCase().trim())}
                                 disabled={isLoading}
                             />
                         </div>
