@@ -19,6 +19,8 @@ import Requests from "./pages/Requests";
 import Users from "./pages/Users";
 import AuditLogs from "./pages/AuditLogs";
 import PendingTools from "./pages/PendingTools";
+import DailyJournal from "./pages/DailyJournal";
+import TeamLogs from "./pages/TeamLogs";
 import NotFound from "./pages/NotFound";
 
 
@@ -65,6 +67,8 @@ const App = () => (
                 <Route path="/tools" element={<Tools />} />
                 <Route path="/tools/:id" element={<ToolDetail />} />
                 <Route path="/requests" element={<Requests />} />
+                <Route path="/daily-journal" element={<DailyJournal />} />
+                <Route path="/team-logs" element={<TeamLogs />} />
                 <Route path="/pending-tools" element={<PendingTools />} />
                 <Route path="/users" element={<Users />} />
                 <Route path="/audit-logs" element={<AuditLogs />} />

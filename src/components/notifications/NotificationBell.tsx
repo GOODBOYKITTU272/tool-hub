@@ -54,7 +54,7 @@ export function NotificationBell() {
                             >
                                 <div className="flex items-start justify-between w-full">
                                     <p className="font-medium text-sm">{notification.title}</p>
-                                    {!notification.is_read && (
+                                    {!notification.read && (
                                         <div className="h-2 w-2 rounded-full bg-blue-500 mt-1" />
                                     )}
                                 </div>
@@ -70,7 +70,7 @@ export function NotificationBell() {
                             onClick={async () => {
                                 // Mark all user notifications as read
                                 for (const notification of userNotifications) {
-                                    if (!notification.is_read) {
+                                    if (!notification.read) {
                                         await markAsRead(notification.id);
                                     }
                                 }

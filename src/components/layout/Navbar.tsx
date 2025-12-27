@@ -26,6 +26,7 @@ import {
   Menu,
   X,
   CheckCircle,
+  BookOpen,
 } from 'lucide-react';
 
 const navItems = [
@@ -47,8 +48,22 @@ export function Navbar() {
   const [pendingCount, setPendingCount] = useState(0);
   const { currentUser, logout } = useAuth();
   const isAdmin = currentUser?.role === 'Admin';
+  const isOwner = currentUser?.role === 'Owner';
+  const isAdminOrOwner = isAdmin || isOwner;
 
-  const allNavItems = isAdmin ? [...navItems, ...adminNavItems] : navItems;
+  // Journal/Logs navigation - different for admin vs owner
+  const journalNavItem = isAdmin
+    ? { label: 'Team Logs', href: '/team-logs', icon: BookOpen }
+    : { label: 'Daily Journal', href: '/daily-journal', icon: BookOpen };
+
+  // Build navigation items based on role
+  let allNavItems = [...navItems];
+  if (isAdminOrOwner) {
+    allNavItems.push(journalNavItem);
+  }
+  if (isAdmin) {
+    allNavItems = [...allNavItems, ...adminNavItems];
+  }
 
   // Fetch pending tools count for admins
   useEffect(() => {

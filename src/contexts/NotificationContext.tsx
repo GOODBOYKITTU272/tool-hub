@@ -104,14 +104,14 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         try {
             const { error } = await supabase
                 .from('notifications')
-                .update({ is_read: true })
+                .update({ read: true })
                 .eq('id', notificationId);
 
             if (error) throw error;
 
             // Update local state
             setNotifications(notifications.map(n =>
-                n.id === notificationId ? { ...n, is_read: true, read: true } : n
+                n.id === notificationId ? { ...n, read: true } : n
             ));
         } catch (error) {
             console.error('Error marking notification as read:', error);

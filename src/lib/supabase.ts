@@ -71,6 +71,42 @@ export interface Database {
                     approval_status: 'pending' | 'approved' | 'rejected';
                     created_at: string;
                     updated_at: string;
+                    environment_variables: Array<{ key: string; value: string }> | null;
+                    architecture: string | null;
+                    language: string | null;
+                    tech_stack: string | null;
+                    hosting_provider: string | null;
+                    hosting_details: string | null;
+                    demo_url: string | null;
+                    demo_username: string | null;
+                    demo_password: string | null;
+                    // NEW FIELDS - Overview Tab
+                    status: 'live' | 'in_development' | 'maintenance' | 'deprecated';
+                    purpose: string | null;
+                    primary_users: string | null;
+                    // NEW FIELDS - Architecture Tab
+                    system_diagram_url: string | null;
+                    database_info: string | null;
+                    key_dependencies: string | null;
+                    data_flow: string | null;
+                    third_party_services: string | null;
+                    // NEW FIELDS - Language & Tech Tab
+                    frontend_stack: string | null;
+                    backend_stack: string | null;
+                    package_manager: 'npm' | 'yarn' | 'pnpm' | 'other' | null;
+                    node_version: string | null;
+                    build_tool: string | null;
+                    // NEW FIELDS - Hosting Tab
+                    production_url: string | null;
+                    staging_url: string | null;
+                    deployment_method: string | null;
+                    cicd_pipeline: string | null;
+                    monitoring_tools: string | null;
+                    backup_strategy: string | null;
+                    // NEW FIELDS - Demo Login Tab
+                    demo_account_type: string | null;
+                    demo_data_reset_schedule: string | null;
+                    demo_limitations: string | null;
                 };
                 Insert: {
                     id?: string;
@@ -87,6 +123,38 @@ export interface Database {
                     approval_status?: 'pending' | 'approved' | 'rejected';
                     created_at?: string;
                     updated_at?: string;
+                    environment_variables?: Array<{ key: string; value: string }> | null;
+                    architecture?: string | null;
+                    language?: string | null;
+                    tech_stack?: string | null;
+                    hosting_provider?: string | null;
+                    hosting_details?: string | null;
+                    demo_url?: string | null;
+                    demo_username?: string | null;
+                    demo_password?: string | null;
+                    // NEW FIELDS
+                    status?: 'live' | 'in_development' | 'maintenance' | 'deprecated';
+                    purpose?: string | null;
+                    primary_users?: string | null;
+                    system_diagram_url?: string | null;
+                    database_info?: string | null;
+                    key_dependencies?: string | null;
+                    data_flow?: string | null;
+                    third_party_services?: string | null;
+                    frontend_stack?: string | null;
+                    backend_stack?: string | null;
+                    package_manager?: 'npm' | 'yarn' | 'pnpm' | 'other' | null;
+                    node_version?: string | null;
+                    build_tool?: string | null;
+                    production_url?: string | null;
+                    staging_url?: string | null;
+                    deployment_method?: string | null;
+                    cicd_pipeline?: string | null;
+                    monitoring_tools?: string | null;
+                    backup_strategy?: string | null;
+                    demo_account_type?: string | null;
+                    demo_data_reset_schedule?: string | null;
+                    demo_limitations?: string | null;
                 };
                 Update: {
                     id?: string;
@@ -103,6 +171,38 @@ export interface Database {
                     approval_status?: 'pending' | 'approved' | 'rejected';
                     created_at?: string;
                     updated_at?: string;
+                    environment_variables?: Array<{ key: string; value: string }> | null;
+                    architecture?: string | null;
+                    language?: string | null;
+                    tech_stack?: string | null;
+                    hosting_provider?: string | null;
+                    hosting_details?: string | null;
+                    demo_url?: string | null;
+                    demo_username?: string | null;
+                    demo_password?: string | null;
+                    // NEW FIELDS
+                    status?: 'live' | 'in_development' | 'maintenance' | 'deprecated';
+                    purpose?: string | null;
+                    primary_users?: string | null;
+                    system_diagram_url?: string | null;
+                    database_info?: string | null;
+                    key_dependencies?: string | null;
+                    data_flow?: string | null;
+                    third_party_services?: string | null;
+                    frontend_stack?: string | null;
+                    backend_stack?: string | null;
+                    package_manager?: 'npm' | 'yarn' | 'pnpm' | 'other' | null;
+                    node_version?: string | null;
+                    build_tool?: string | null;
+                    production_url?: string | null;
+                    staging_url?: string | null;
+                    deployment_method?: string | null;
+                    cicd_pipeline?: string | null;
+                    monitoring_tools?: string | null;
+                    backup_strategy?: string | null;
+                    demo_account_type?: string | null;
+                    demo_data_reset_schedule?: string | null;
+                    demo_limitations?: string | null;
                 };
                 Relationships: [];
             };
@@ -213,6 +313,70 @@ export interface Database {
                     {
                         foreignKeyName: "notifications_user_id_fkey";
                         columns: ["user_id"];
+                        isOneToOne: false;
+                        referencedRelation: "users";
+                        referencedColumns: ["id"];
+                    }
+                ];
+            };
+            daily_logs: {
+                Row: {
+                    id: string;
+                    user_id: string;
+                    date: string;
+                    tasks_completed: string;
+                    blockers: string | null;
+                    collaboration_notes: string | null;
+                    work_type: 'own_tool' | 'others_tool';
+                    tool_id: string | null;
+                    tool_owner_id: string | null;
+                    created_at: string;
+                    updated_at: string;
+                };
+                Insert: {
+                    id?: string;
+                    user_id: string;
+                    date: string;
+                    tasks_completed: string;
+                    blockers?: string | null;
+                    collaboration_notes?: string | null;
+                    work_type: 'own_tool' | 'others_tool';
+                    tool_id?: string | null;
+                    tool_owner_id?: string | null;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Update: {
+                    id?: string;
+                    user_id?: string;
+                    date?: string;
+                    tasks_completed?: string;
+                    blockers?: string | null;
+                    collaboration_notes?: string | null;
+                    work_type?: 'own_tool' | 'others_tool';
+                    tool_id?: string | null;
+                    tool_owner_id?: string | null;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Relationships: [
+                    {
+                        foreignKeyName: "daily_logs_user_id_fkey";
+                        columns: ["user_id"];
+                        isOneToOne: false;
+                        referencedRelation: "users";
+                        referencedColumns: ["id"];
+                    },
+                    {
+                        foreignKeyName: "daily_logs_tool_id_fkey";
+                        columns: ["tool_id"];
+                        isOneToOne: false;
+                        referencedRelation: "tools";
+                        referencedColumns: ["id"];
+                    },
+                    {
+                        foreignKeyName: "daily_logs_tool_owner_id_fkey";
+                        columns: ["tool_owner_id"];
                         isOneToOne: false;
                         referencedRelation: "users";
                         referencedColumns: ["id"];
