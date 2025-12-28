@@ -19,6 +19,17 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     }
 });
 
+// Admin client with service role key (bypasses RLS)
+const serviceKey = import.meta.env.VITE_SUPABASE_SERVICE_KEY;
+export const supabaseAdmin = serviceKey
+    ? createClient<Database>(supabaseUrl, serviceKey, {
+        auth: {
+            autoRefreshToken: false,
+            persistSession: false
+        }
+    })
+    : supabase; // Fallback to regular client if no service key
+
 // Database types
 export type UserRole = 'Admin' | 'Owner' | 'Observer';
 

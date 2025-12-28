@@ -3,7 +3,7 @@ import { CalendarView } from '@/components/journal/CalendarView';
 import { DailyLogForm, DailyLog, DailyLogInput } from '@/components/journal/DailyLogForm';
 import { DailyLogView } from '@/components/journal/DailyLogView';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { BookOpen, TrendingUp, Calendar as CalendarIcon } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,7 +38,7 @@ export default function DailyJournal() {
 
         setLoading(true);
         try {
-            const { data, error } = await supabase
+            const { data, error } = await supabaseAdmin
                 .from('daily_logs')
                 .select('*')
                 .eq('user_id', currentUser.id)
@@ -76,7 +76,7 @@ export default function DailyJournal() {
             };
 
             // Always insert new log (multiple logs per day supported)
-            const { error } = await supabase
+            const { error } = await supabaseAdmin
                 .from('daily_logs')
                 .insert([logData]);
 
