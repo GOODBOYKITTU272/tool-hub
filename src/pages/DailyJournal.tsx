@@ -38,11 +38,11 @@ export default function DailyJournal() {
 
         setLoading(true);
         try {
-            const { data, error } = await supabaseAdmin
-                .from('daily_logs')
-                .select('*')
-                .eq('user_id', currentUser.id)
-                .order('date', { ascending: false });
+            // Use RPC function to bypass RLS
+            const { data, error } = await supabase
+                .rpc('get_user_daily_logs', {
+                    p_user_id: currentUser.id
+                });
 
             if (error) throw error;
             setLogs(data || []);
@@ -63,22 +63,18 @@ export default function DailyJournal() {
 
         setSaving(true);
         try {
-            const logData = {
-                user_id: currentUser.id,
-                date: logInput.date,
-                tasks_completed: logInput.tasks_completed,
-                blockers: logInput.blockers || null,
-                collaboration_notes: logInput.collaboration_notes || null,
-                // New structured fields
-                work_type: logInput.work_type,
-                tool_id: logInput.tool_id || null,
-                tool_owner_id: logInput.tool_owner_id || null,
-            };
-
-            // Always insert new log (multiple logs per day supported)
-            const { error } = await supabaseAdmin
-                .from('daily_logs')
-                .insert([logData]);
+            // Use RPC function to bypass RLS
+            const { data, error } = await supabase
+                .rpc('insert_daily_log', {
+                    p_user_id: currentUser.id,
+                    p_date: logInput.date,
+                    p_work_type: logInput.work_type || 'own_tool',
+                    p_tool_id: logInput.tool_id || null,
+                    p_tool_owner_id: logInput.tool_owner_id || null,
+                    p_tasks_completed: logInput.tasks_completed,
+                    p_blockers: logInput.blockers || '',
+                    p_collaboration_notes: logInput.collaboration_notes || ''
+                });
 
             if (error) throw error;
 
