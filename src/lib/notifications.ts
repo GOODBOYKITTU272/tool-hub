@@ -143,26 +143,26 @@ export async function getUnreadCount(userId: string): Promise<{ count: number; e
 }
 
 /**
- * Mark a notification as read
+ * Delete a notification (marks as read by deleting it)
  * 
- * @param notificationId - Notification ID to mark as read
+ * @param notificationId - Notification ID to delete
  * @returns Promise with success status
  */
 export async function markAsRead(notificationId: string): Promise<{ success: boolean; error?: string }> {
     try {
         const { error } = await supabase
             .from('notifications')
-            .update({ is_read: true })
+            .delete()
             .eq('id', notificationId);
 
         if (error) {
-            console.error('❌ Error marking notification as read:', error);
+            console.error('❌ Error deleting notification:', error);
             return { success: false, error: error.message };
         }
 
         return { success: true };
     } catch (error) {
-        console.error('❌ Exception marking notification as read:', error);
+        console.error('❌ Exception deleting notification:', error);
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Unknown error'

@@ -104,17 +104,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         try {
             const { error } = await supabase
                 .from('notifications')
-                .update({ read: true })
+                .delete()
                 .eq('id', notificationId);
 
             if (error) throw error;
 
-            // Update local state
-            setNotifications(notifications.map(n =>
-                n.id === notificationId ? { ...n, read: true } : n
-            ));
+            // Remove from local state (deleted, not just marked as read)
+            setNotifications(notifications.filter(n => n.id !== notificationId));
         } catch (error) {
-            console.error('Error marking notification as read:', error);
+            console.error('Error deleting notification:', error);
         }
     };
 
