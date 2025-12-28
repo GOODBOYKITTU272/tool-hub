@@ -85,18 +85,18 @@ export async function fetchNotifications(
     unreadOnly: boolean = false
 ) {
     try {
-        let query = supabase
+        let baseQuery = supabase
             .from('notifications')
             .select('*')
-            .eq('user_id', userId)
-            .order('created_at', { ascending: false })
-            .limit(limit);
+            .eq('user_id', userId);
 
         if (unreadOnly) {
-            query = query.eq('is_read', false);
+            baseQuery = baseQuery.eq('is_read', false) as typeof baseQuery;
         }
 
-        const { data, error } = await query;
+        const { data, error } = await baseQuery
+            .order('created_at', { ascending: false })
+            .limit(limit);
 
         if (error) {
             console.error('❌ Error fetching notifications:', error);

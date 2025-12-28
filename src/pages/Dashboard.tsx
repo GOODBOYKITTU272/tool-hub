@@ -6,6 +6,7 @@ import { ToolCard } from '@/components/tools/ToolCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import {
   Wrench,
   MessageSquare,
@@ -44,6 +45,13 @@ export default function Dashboard() {
   useEffect(() => {
     fetchDashboardData();
   }, [currentUser]);
+
+  // Subscribe to real-time updates for tools table
+  useRealtimeSubscription('tools', (payload) => {
+    console.log('📡 [Dashboard] Realtime update:', payload.eventType);
+    // Refresh dashboard whenever tools are inserted, updated, or deleted
+    fetchDashboardData();
+  });
 
   const fetchDashboardData = async () => {
     try {
