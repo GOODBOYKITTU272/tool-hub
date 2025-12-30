@@ -152,10 +152,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const initAuth = async () => {
             try {
-                // Get initial session with 10s timeout
+                // Get initial session with 20s timeout (increased for cold starts)
                 const sessionRes = await withTimeout(
                     supabase.auth.getSession(),
-                    10000,
+                    20000,
                     'Session check timed out'
                 ) as { data: { session: Session | null }, error: any };
 
@@ -235,13 +235,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.log('🔑 [Auth] Starting login for:', email);
             const normalizedEmail = normalizeEmail(email);
 
-            // Sign in with Supabase Auth (15s timeout)
+            // Sign in with Supabase Auth (30s timeout for cold starts)
             const loginRes = await withTimeout(
                 supabase.auth.signInWithPassword({
                     email: normalizedEmail,
                     password: password,
                 }),
-                15000,
+                30000,
                 'Login request timed out. Please check your connection.'
             ) as { data: { user: SupabaseUser | null, session: Session | null }, error: any };
 
