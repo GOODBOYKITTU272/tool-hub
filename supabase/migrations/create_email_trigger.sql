@@ -16,7 +16,7 @@ BEGIN
     url := 'https://eeqiifpbpurvidvhpanu.supabase.co/functions/v1/send-daily-prep-email',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVlcWlpZnBicHVydmlkdmhwYW51Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU1NDk1MzEsImV4cCI6MjA4MTEyNTUzMX0.sVPVUg5oS1BqGbViD0gBpN_pGAxAkqdvGqifbnRXtN8'
+      'Authorization', 'Bearer YOUR_SUPABASE_ANON_KEY'
     ),
     body := jsonb_build_object(
       'user_id', NEW.user_id,

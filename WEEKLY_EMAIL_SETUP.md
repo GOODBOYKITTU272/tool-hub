@@ -73,7 +73,7 @@ Each weekly email includes:
 
 ```bash
 curl -i --location --request POST 'https://eeqiifpbpurvidvhpanu.supabase.co/functions/v1/send-weekly-summary-email' \
-  --header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVlcWlpZnBicHVydmlkdmhwYW51Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU1NDk1MzEsImV4cCI6MjA4MTEyNTUzMX0.sVPVUg5oS1BqGbViD0gBpN_pGAxAkqdvGqifbnRXtN8' \
+  --header 'Authorization: Bearer YOUR_SUPABASE_ANON_KEY' \
   --header 'Content-Type: application/json' \
   --data '{}'
 ```
@@ -82,7 +82,7 @@ curl -i --location --request POST 'https://eeqiifpbpurvidvhpanu.supabase.co/func
 
 ```bash
 curl -i --location --request POST 'https://eeqiifpbpurvidvhpanu.supabase.co/functions/v1/send-weekly-summary-email' \
-  --header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVlcWlpZnBicHVydmlkdmhwYW51Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU1NDk1MzEsImV4cCI6MjA4MTEyNTUzMX0.sVPVUg5oS1BqGbViD0gBpN_pGAxAkqdvGqifbnRXtN8' \
+  --header 'Authorization: Bearer YOUR_SUPABASE_ANON_KEY' \
   --header 'Content-Type: application/json' \
   --data '{"start_date":"2025-12-15","end_date":"2025-12-21"}'
 ```

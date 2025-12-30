@@ -25,8 +25,8 @@ The Edge Function needs **environment secrets** set in Supabase to access the da
 3. Add these secrets:
 
 ```bash
-GEMINI_API_KEY=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
-RESEND_API_KEY=re_X9Q6mVGi_KxXcugDF6RVBDZYhSzEafQLb
+OPENAI_API_KEY=your_openai_api_key_here
+RESEND_API_KEY=your_resend_api_key_here
 ```
 
 **Note**: `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` should be automatically available. If not, you can find them in:

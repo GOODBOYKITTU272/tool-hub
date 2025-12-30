@@ -40,7 +40,7 @@ npx supabase functions deploy send-daily-prep-email
 
 ```bash
 curl -i --location --request POST 'https://eeqiifpbpurvidvhpanu.supabase.co/functions/v1/send-daily-prep-email' \
-  --header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVlcWlpZnBicHVydmlkdmhwYW51Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU1NDk1MzEsImV4cCI6MjA4MTEyNTUzMX0.sVPVUg5oS1BqGbViD0gBpN_pGAxAkqdvGqifbnRXtN8' \
+  --header 'Authorization: Bearer YOUR_SUPABASE_ANON_KEY' \
   --header 'Content-Type: application/json' \
   --data '{"log_id":"your-log-id","user_id":"your-user-id"}'
 ```
