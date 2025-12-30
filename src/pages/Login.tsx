@@ -76,19 +76,26 @@ export default function Login() {
       return;
     }
 
+    console.log('🔐 [Login] Starting MFA verification...');
     setIsLoading(true);
     try {
       const result = await verifyMfa(mfaCode);
+      console.log('🔍 [Login] MFA Result:', result);
+
       if (result.success) {
+        console.log('✅ [Login] MFA verified successfully, navigating to dashboard...');
         toast({
           title: 'Welcome back!',
           description: 'MFA Verification successful.',
         });
         navigate('/dashboard');
+        console.log('🚀 [Login] Navigation triggered');
       } else {
+        console.error('❌ [Login] MFA verification failed:', result.error);
         setError(result.error || 'Invalid security code');
       }
     } catch (err) {
+      console.error('❌ [Login] MFA exception:', err);
       setError('MFA verification failed. Please try again.');
     } finally {
       setIsLoading(false);
