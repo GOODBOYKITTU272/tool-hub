@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { KanbanBoard } from '@/components/kanban/KanbanBoard';
+import { BusinessClarityTab } from '@/components/tools/BusinessClarityTab';
 import {
   ArrowLeft,
   Edit,
@@ -303,6 +304,7 @@ export default function ToolDetail() {
           <TabsTrigger value="language-tech">Language & Tech</TabsTrigger>
           <TabsTrigger value="hosting">Hosting</TabsTrigger>
           <TabsTrigger value="demo-login">Demo Login</TabsTrigger>
+          <TabsTrigger value="business">Business Clarity</TabsTrigger>
           <TabsTrigger value="walkthrough">Code Walkthrough</TabsTrigger>
           <TabsTrigger value="requests">
             Requests
@@ -776,6 +778,12 @@ export default function ToolDetail() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+
+        {/* Business Clarity Tab */}
+        <TabsContent value="business" className="mt-6">
+          <BusinessClarityTab tool={tool} />
         </TabsContent>
 
         <TabsContent value="walkthrough" className="mt-6">

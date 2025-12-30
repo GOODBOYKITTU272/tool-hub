@@ -397,6 +397,71 @@ export interface Database {
                     }
                 ];
             };
+            tool_business_clarity: {
+                Row: {
+                    id: string;
+                    tool_id: string;
+                    why_building: string | null;
+                    problem_statement: string | null;
+                    target_audience: string | null;
+                    company_usage: string | null;
+                    revenue_model: string | null;
+                    primary_user: string | null;
+                    user_persona: string | null;
+                    end_to_end_workflow: string | null;
+                    challenges_risks: string | null;
+                    success_metrics: string | null;
+                    created_by: string | null;
+                    updated_by: string | null;
+                    created_at: string;
+                    updated_at: string;
+                };
+                Insert: {
+                    id?: string;
+                    tool_id: string;
+                    why_building?: string | null;
+                    problem_statement?: string | null;
+                    target_audience?: string | null;
+                    company_usage?: string | null;
+                    revenue_model?: string | null;
+                    primary_user?: string | null;
+                    user_persona?: string | null;
+                    end_to_end_workflow?: string | null;
+                    challenges_risks?: string | null;
+                    success_metrics?: string | null;
+                    created_by?: string | null;
+                    updated_by?: string | null;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Update: {
+                    id?: string;
+                    tool_id?: string;
+                    why_building?: string | null;
+                    problem_statement?: string | null;
+                    target_audience?: string | null;
+                    company_usage?: string | null;
+                    revenue_model?: string | null;
+                    primary_user?: string | null;
+                    user_persona?: string | null;
+                    end_to_end_workflow?: string | null;
+                    challenges_risks?: string | null;
+                    success_metrics?: string | null;
+                    created_by?: string | null;
+                    updated_by?: string | null;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Relationships: [
+                    {
+                        foreignKeyName: "tool_business_clarity_tool_id_fkey";
+                        columns: ["tool_id"];
+                        isOneToOne: true;
+                        referencedRelation: "tools";
+                        referencedColumns: ["id"];
+                    }
+                ];
+            };
         };
         Views: {
             [_ in never]: never;
