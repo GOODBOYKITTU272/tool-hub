@@ -34,18 +34,17 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Schedule the job to run every Friday at 8:30 AM UTC (2:00 PM IST)
--- This assumes the server time is UTC; adjust if needed
+-- Using explicit argument types to avoid function ambiguity
 SELECT cron.schedule(
-    'weekly-summary-emails',      -- job name
-    '30 8 * * 5',                -- cron schedule: 8:30 AM on Fridays
-    $$SELECT trigger_weekly_summary_email();$$  -- SQL to execute
+    'weekly-summary-emails'::text,      -- job name
+    '30 8 * * 5'::text,                 -- cron schedule: 8:30 AM on Fridays
+    'SELECT trigger_weekly_summary_email();'::text  -- SQL to execute
 );
 
 -- Grant necessary permissions
 GRANT USAGE ON SCHEMA cron TO postgres, anon, authenticated, service_role;
 GRANT USAGE ON SCHEMA extensions TO postgres, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION trigger_weekly_summary_email() TO postgres, anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION cron.schedule TO service_role;
 
 -- Verify the job was scheduled
 SELECT jobid, schedule, command, active 
