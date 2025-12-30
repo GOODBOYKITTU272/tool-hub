@@ -57,6 +57,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     };
 
+    // Helper to retry failed requests (for cold starts)
+    const withRetry = async <T,>(fn: () => Promise<T>, retries = 1): Promise<T> => {
+        for (let i = 0; i <= retries; i++) {
+            try {
+                return await fn();
+            } catch (error: any) {
+                const isTimeout = error.message?.includes('timed out');
+                const shouldRetry = isTimeout && i < retries;
+
+                if (shouldRetry) {
+                    console.log(`🔄 Retry ${i + 1}/${retries} after timeout...`);
+                    await new Promise(r => setTimeout(r, 2000)); // Wait 2s before retry
+                    continue;
+                }
+                throw error;
+            }
+        }
+        throw new Error('Max retries exceeded');
+    };
+
     const readCachedProfile = (authUserId: string): User | null => {
         try {
             if (typeof window === 'undefined') return null;
@@ -88,10 +108,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 .eq('id', authUserId)
                 .single();
 
-            // Strict 10 second timeout for profile fetch
+            // 30 second timeout for profile fetch (cold starts)
             const profileRes = await withTimeout(
                 fetchPromise,
-                10000,
+                30000,
                 'Profile fetch timed out'
             ) as { data: any, error: any };
 
@@ -152,11 +172,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const initAuth = async () => {
             try {
-                // Get initial session with 20s timeout (increased for cold starts)
-                const sessionRes = await withTimeout(
-                    supabase.auth.getSession(),
-                    20000,
-                    'Session check timed out'
+                // Get initial session with 30s timeout + retry (increased for cold starts)
+                const sessionRes = await withRetry(() =>
+                    withTimeout(
+                        supabase.auth.getSession(),
+                        30000,
+                        'Session check timed out'
+                    )
                 ) as { data: { session: Session | null }, error: any };
 
                 const session = sessionRes.data?.session || null;
@@ -235,14 +257,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.log('🔑 [Auth] Starting login for:', email);
             const normalizedEmail = normalizeEmail(email);
 
-            // Sign in with Supabase Auth (30s timeout for cold starts)
-            const loginRes = await withTimeout(
-                supabase.auth.signInWithPassword({
-                    email: normalizedEmail,
-                    password: password,
-                }),
-                30000,
-                'Login request timed out. Please check your connection.'
+            // Sign in with Supabase Auth (30s timeout + retry for cold starts)
+            const loginRes = await withRetry(() =>
+                withTimeout(
+                    supabase.auth.signInWithPassword({
+                        email: normalizedEmail,
+                        password: password,
+                    }),
+                    30000,
+                    'Login request timed out. Please check your connection.'
+                )
             ) as { data: { user: SupabaseUser | null, session: Session | null }, error: any };
 
             const { data, error } = loginRes;
@@ -283,7 +307,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 return { success: true, mfaRequired: true };
             }
 
-            // Fetch user profile (10s timeout via fetchUserProfile)
+            // Fetch user profile (30s timeout via fetchUserProfile)
             const profile = await fetchUserProfile(data.user.id);
 
             if (!profile) {
