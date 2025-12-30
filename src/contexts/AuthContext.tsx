@@ -317,22 +317,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Verify MFA function
     const verifyMfa = async (code: string) => {
         try {
-            if (!mfaChallengeId || !mfaFactorId) {
-                return { success: false, error: 'No active MFA challenge found.' };
+            if (!mfaFactorId) {
+                return { success: false, error: 'No active MFA factor found. Please log in again.' };
             }
 
+            // If challenge is missing or expired, create a new one
+            let currentChallengeId = mfaChallengeId;
+            if (!currentChallengeId) {
+                console.log('🔄 [MFA] Creating new challenge...');
+                const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
+                    factorId: mfaFactorId
+                });
+                if (challengeError) {
+                    return { success: false, error: `Failed to create MFA challenge: ${challengeError.message}` };
+                }
+                currentChallengeId = challengeData.id;
+                setMfaChallengeId(currentChallengeId);
+            }
+
+            console.log('🔐 [MFA] Verifying code...');
             const { error } = await supabase.auth.mfa.verify({
                 factorId: mfaFactorId,
-                challengeId: mfaChallengeId,
+                challengeId: currentChallengeId,
                 code: code
             });
 
-            if (error) {
-                return { success: false, error: error.message };
+            // If verification failed due to expired challenge, create new challenge and retry
+            if (error && (error.message.includes('expired') || error.status === 422)) {
+                console.log('🔄 [MFA] Challenge expired, creating new one...');
+                const { data: newChallenge, error: newChallengeError } = await supabase.auth.mfa.challenge({
+                    factorId: mfaFactorId
+                });
+                if (newChallengeError) {
+                    return { success: false, error: 'MFA challenge expired. Please try again.' };
+                }
+
+                setMfaChallengeId(newChallenge.id);
+
+                // Retry verification with new challenge
+                const { error: retryError } = await supabase.auth.mfa.verify({
+                    factorId: mfaFactorId,
+                    challengeId: newChallenge.id,
+                    code: code
+                });
+
+                if (retryError) {
+                    return { success: false, error: retryError.message || 'Invalid code. Please try again.' };
+                }
+            } else if (error) {
+                return { success: false, error: error.message || 'Invalid verification code.' };
             }
 
             setMfaChallengeId(null);
             setMfaFactorId(null);
+
+            // IMPORTANT: Set MFA enabled immediately to prevent ProtectedRoute race condition
+            setIsMfaEnabled(true);
 
             // Re-fetch profile now that we are fully authed
             const { data: { user } } = await supabase.auth.getUser();
@@ -341,12 +381,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 if (profile) setCurrentUser(profile);
             }
 
-            // Re-check MFA status
-            const mfaStatus = await checkMfaStatus();
-            setIsMfaEnabled(mfaStatus);
-
             return { success: true };
         } catch (error: any) {
+            console.error('❌ [MFA] Verification error:', error);
             return { success: false, error: error.message || 'MFA verification failed.' };
         }
     };

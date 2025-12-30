@@ -1,59 +1,49 @@
 -- Fix RLS policies for daily_logs table
--- This allows users to insert, update, and view their own logs
+-- Allow users to read their own logs and admins to read all logs
 
-BEGIN;
+-- Enable RLS if not already enabled
+ALTER TABLE IF EXISTS public.daily_logs ENABLE ROW LEVEL SECURITY;
 
--- Drop existing policies
-DROP POLICY IF EXISTS "Users can view own logs" ON daily_logs;
-DROP POLICY IF EXISTS "Users can insert own logs" ON daily_logs;
-DROP POLICY IF EXISTS "Users can update own logs" ON daily_logs;
-DROP POLICY IF EXISTS "Users can delete own logs" ON daily_logs;
-DROP POLICY IF EXISTS "Admins can view all logs" ON daily_logs;
+-- Drop existing policies to recreate
+DROP POLICY IF EXISTS "Users can view own daily logs" ON public.daily_logs;
+DROP POLICY IF EXISTS "Users can insert own daily logs" ON public.daily_logs;
+DROP POLICY IF EXISTS "Users can update own daily logs" ON public.daily_logs;
+DROP POLICY IF EXISTS "Admins can view all daily logs" ON public.daily_logs;
 
--- Enable RLS
-ALTER TABLE daily_logs ENABLE ROW LEVEL SECURITY;
-
--- Policy: Users can view their own logs
-CREATE POLICY "Users can view own logs"
-ON daily_logs
+-- Users can view their own logs
+CREATE POLICY "Users can view own daily logs"
+ON public.daily_logs
 FOR SELECT
-USING (auth.uid() = user_id);
+TO authenticated
+USING (user_id = auth.uid());
 
--- Policy: Users can insert their own logs
-CREATE POLICY "Users can insert own logs"
-ON daily_logs
+-- Users can insert their own logs
+CREATE POLICY "Users can insert own daily logs"
+ON public.daily_logs
 FOR INSERT
-WITH CHECK (auth.uid() = user_id);
+TO authenticated
+WITH CHECK (user_id = auth.uid());
 
--- Policy: Users can update their own logs
-CREATE POLICY "Users can update own logs"
-ON daily_logs
+-- Users can update their own logs
+CREATE POLICY "Users can update own daily logs"
+ON public.daily_logs
 FOR UPDATE
-USING (auth.uid() = user_id)
-WITH CHECK (auth.uid() = user_id);
+TO authenticated
+USING (user_id = auth.uid())
+WITH CHECK (user_id = auth.uid());
 
--- Policy: Users can delete their own logs
-CREATE POLICY "Users can delete own logs"
-ON daily_logs
-FOR DELETE
-USING (auth.uid() = user_id);
-
--- Policy: Admins and Owners can view all logs
-CREATE POLICY "Admins can view all logs"
-ON daily_logs
+-- Admins can view all logs
+CREATE POLICY "Admins can view all daily logs"
+ON public.daily_logs
 FOR SELECT
+TO authenticated
 USING (
-  EXISTS (
-    SELECT 1 FROM users
-    WHERE users.id = auth.uid()
-    AND users.role IN ('admin', 'owner')
-  )
+    EXISTS (
+        SELECT 1 FROM public.users
+        WHERE users.id = auth.uid()
+        AND users.role = 'Admin'
+    )
 );
 
-COMMIT;
-
 -- Verify policies
-SELECT schemaname, tablename, policyname, permissive, roles, cmd, qual
-FROM pg_policies
-WHERE tablename = 'daily_logs'
-ORDER BY policyname;
+SELECT policyname, cmd FROM pg_policies WHERE tablename = 'daily_logs';
