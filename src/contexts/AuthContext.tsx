@@ -42,6 +42,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Helper to normalize email (lowercase)
     const normalizeEmail = (email: string) => email.toLowerCase().trim();
 
+    // Helper to validate ApplyWizz email domain
+    const validateEmailDomain = (email: string): { valid: boolean; error?: string } => {
+        const normalizedEmail = normalizeEmail(email);
+        const domain = normalizedEmail.split('@')[1];
+
+        if (domain !== 'applywizz.com') {
+            return {
+                valid: false,
+                error: 'Access restricted: Only @applywizz.com email addresses are allowed. Please use your ApplyWizz company email.'
+            };
+        }
+
+        return { valid: true };
+    };
+
     // Helper to add timeout to promises
     const withTimeout = async <T,>(promise: Promise<T> | any, timeoutMs: number, errorMsg: string): Promise<T> => {
         let timeoutId: any;
@@ -256,6 +271,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
             console.log('🔑 [Auth] Starting login for:', email);
             const normalizedEmail = normalizeEmail(email);
+
+            // Validate email domain (ApplyWizz only)
+            const domainCheck = validateEmailDomain(normalizedEmail);
+            if (!domainCheck.valid) {
+                return { success: false, error: domainCheck.error };
+            }
 
             // Sign in with Supabase Auth (30s timeout + retry for cold starts)
             const loginRes = await withRetry(() =>

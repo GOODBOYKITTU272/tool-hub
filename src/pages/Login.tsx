@@ -110,8 +110,11 @@ export default function Login() {
             <Wrench className="w-7 h-7 text-primary-foreground" />
           </div>
           <CardTitle className="text-2xl font-display">Welcome Back</CardTitle>
-          <CardDescription>
-            Sign in to access your tool management dashboard
+          <CardDescription className="space-y-1">
+            <div>Sign in to access your tool management dashboard</div>
+            <div className="text-xs font-medium text-primary mt-2 bg-primary/10 px-3 py-1.5 rounded-md inline-block">
+              🔒 ApplyWizz Team Only • @applywizz.com emails required
+            </div>
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -122,7 +125,9 @@ export default function Login() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="you@applywizz.com"
+                  placeholder="yourname@applywizz.com"
+                  pattern=".*@applywizz\.com$"
+                  title="Please use your @applywizz.com email address"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={isLoading}
