@@ -26,24 +26,18 @@ npx supabase functions deploy send-weekly-summary-email
 Go to Supabase Dashboard → Edge Functions → Secrets and add:
 
 ```bash
-# AWS Bedrock Configuration
-AWS_ACCESS_KEY_ID=YOUR_AWS_ACCESS_KEY_HERE
-AWS_SECRET_ACCESS_KEY=TSNiM/9etBzUPROVeHwFidzpODSCsKuVCMQoUupf
-AWS_REGION=us-east-1
-BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0
+# OpenAI Configuration (for AI-powered email generation)
+OPENAI_API_KEY=your_openai_api_key_here
 
 # Email Service
-RESEND_API_KEY=re_X9Q6mVGi_KxXcugDF6RVBDZYhSzEafQLb
+RESEND_API_KEY=your_resend_api_key_here
 ```
 
 Or use CLI:
 
 ```bash
-npx supabase secrets set AWS_ACCESS_KEY_ID=YOUR_AWS_ACCESS_KEY_HERE
-npx supabase secrets set AWS_SECRET_ACCESS_KEY=TSNiM/9etBzUPROVeHwFidzpODSCsKuVCMQoUupf
-npx supabase secrets set AWS_REGION=us-east-1
-npx supabase secrets set BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0
-npx supabase secrets set RESEND_API_KEY=re_X9Q6mVGi_KxXcugDF6RVBDZYhSzEafQLb
+npx supabase secrets set OPENAI_API_KEY=your_openai_api_key_here
+npx supabase secrets set RESEND_API_KEY=your_resend_api_key_here
 ```
 
 ### 3. Apply the Database Migration
