@@ -118,6 +118,7 @@ export interface Database {
                     demo_account_type: string | null;
                     demo_data_reset_schedule: string | null;
                     demo_limitations: string | null;
+                    demo_logins: Array<{ role_name: string; username: string; password: string; description: string }> | null;
                 };
                 Insert: {
                     id?: string;
@@ -166,6 +167,7 @@ export interface Database {
                     demo_account_type?: string | null;
                     demo_data_reset_schedule?: string | null;
                     demo_limitations?: string | null;
+                    demo_logins?: Array<{ role_name: string; username: string; password: string; description: string }> | null;
                 };
                 Update: {
                     id?: string;
@@ -214,6 +216,7 @@ export interface Database {
                     demo_account_type?: string | null;
                     demo_data_reset_schedule?: string | null;
                     demo_limitations?: string | null;
+                    demo_logins?: Array<{ role_name: string; username: string; password: string; description: string }> | null;
                 };
                 Relationships: [];
             };

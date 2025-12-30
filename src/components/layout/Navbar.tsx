@@ -21,9 +21,13 @@ import {
   KanbanSquare,
   Users,
   FileText,
-  LogOut,
+  Search,
+  Bell,
   User,
+  LogOut,
+  ChevronDown,
   Menu,
+  ShieldCheck,
   X,
   CheckCircle,
   BookOpen,
@@ -39,6 +43,7 @@ const adminNavItems = [
   { label: 'Pending Tools', href: '/pending-tools', icon: CheckCircle },
   { label: 'Users', href: '/users', icon: Users },
   { label: 'Audit Logs', href: '/audit-logs', icon: FileText },
+  { label: 'ChatGPT Usage', href: '/chatgpt-usage', icon: LayoutDashboard },
 ];
 
 export function Navbar() {
@@ -192,10 +197,14 @@ export function Navbar() {
                   <User className="mr-2 h-4 w-4" />
                   Profile
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/profile')} className="cursor-pointer gap-2">
+                  <ShieldCheck className="w-4 h-4 text-primary" />
+                  <span>Security & Profile</span>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
                   onClick={handleLogout}
+                  className="text-destructive focus:text-destructive cursor-pointer gap-2"
                 >
                   <LogOut className="mr-2 h-4 w-4" />
                   Log out

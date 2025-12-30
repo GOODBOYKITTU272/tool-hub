@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Save, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Loader2, Save, AlertCircle, CheckCircle2, Sparkles } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -78,6 +78,10 @@ export function DailyLogForm({ selectedDate, existingLog, onSave }: DailyLogForm
         tool_id: undefined,
         tool_owner_id: undefined,
     });
+
+    // AI Enhancement state
+    const [enhancingAccomplishments, setEnhancingAccomplishments] = useState(false);
+    const [enhancingBlockers, setEnhancingBlockers] = useState(false);
 
     // Load tools and team members
     useEffect(() => {
@@ -253,6 +257,54 @@ export function DailyLogForm({ selectedDate, existingLog, onSave }: DailyLogForm
             });
         } finally {
             setLoading(false);
+        }
+    };
+
+    // AI Enhancement function
+    const handleEnhance = async (text: string, context: 'accomplishments' | 'blockers') => {
+        if (!text.trim()) {
+            toast({
+                title: 'Nothing to Enhance',
+                description: 'Please type some text first before enhancing.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        const setEnhancing = context === 'accomplishments' ? setEnhancingAccomplishments : setEnhancingBlockers;
+        setEnhancing(true);
+
+        try {
+            const response = await supabase.functions.invoke('enhance-text', {
+                body: { text, context },
+            });
+
+            if (response.error) throw response.error;
+
+            const enhancedText = response.data.enhancedText;
+
+            // Update form data with enhanced text
+            if (context === 'accomplishments') {
+                setFormData({ ...formData, tasks_completed: enhancedText });
+            } else {
+                setFormData({ ...formData, blockers: enhancedText });
+            }
+
+            toast({
+                title: '✨ Text Enhanced!',
+                description: response.data.usingFallback
+                    ? 'Text has been polished (AI unavailable, used basic enhancement)'
+                    : 'Your text has been professionally enhanced by AI.',
+            });
+        } catch (error: any) {
+            console.error('Enhancement error:', error);
+            toast({
+                title: 'Enhancement Failed',
+                description: error.message || 'Failed to enhance text. Please try again.',
+                variant: 'destructive',
+            });
+        } finally {
+            setEnhancing(false);
         }
     };
 
@@ -469,9 +521,31 @@ export function DailyLogForm({ selectedDate, existingLog, onSave }: DailyLogForm
 
                     {/* Tasks Completed */}
                     <div className="space-y-2">
-                        <Label htmlFor="tasks">
-                            What did you accomplish today? <span className="text-destructive">*</span>
-                        </Label>
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="tasks">
+                                What did you accomplish today? <span className="text-destructive">*</span>
+                            </Label>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleEnhance(formData.tasks_completed, 'accomplishments')}
+                                disabled={enhancingAccomplishments || !formData.tasks_completed.trim()}
+                                className="gap-2 text-xs"
+                            >
+                                {enhancingAccomplishments ? (
+                                    <>
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                        Enhancing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Sparkles className="w-3 h-3" />
+                                        Enhance
+                                    </>
+                                )}
+                            </Button>
+                        </div>
                         <Textarea
                             id="tasks"
                             value={formData.tasks_completed}
@@ -506,7 +580,29 @@ export function DailyLogForm({ selectedDate, existingLog, onSave }: DailyLogForm
 
                     {/* Blockers */}
                     <div className="space-y-2">
-                        <Label htmlFor="blockers">Blockers or Challenges</Label>
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="blockers">Blockers or Challenges</Label>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleEnhance(formData.blockers || '', 'blockers')}
+                                disabled={enhancingBlockers || !formData.blockers?.trim()}
+                                className="gap-2 text-xs"
+                            >
+                                {enhancingBlockers ? (
+                                    <>
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                        Enhancing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Sparkles className="w-3 h-3" />
+                                        Enhance
+                                    </>
+                                )}
+                            </Button>
+                        </div>
                         <Textarea
                             id="blockers"
                             value={formData.blockers}
@@ -545,6 +641,6 @@ export function DailyLogForm({ selectedDate, existingLog, onSave }: DailyLogForm
                     </div>
                 </form>
             </CardContent>
-        </Card>
+        </Card >
     );
 }

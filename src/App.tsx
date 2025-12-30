@@ -8,7 +8,7 @@ import { NotificationProvider } from "@/contexts/NotificationContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ReloadProtection } from "@/components/ReloadProtection";
-import { useEffect } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import PasswordReset from "./pages/PasswordReset";
@@ -21,6 +21,8 @@ import AuditLogs from "./pages/AuditLogs";
 import PendingTools from "./pages/PendingTools";
 import DailyJournal from "./pages/DailyJournal";
 import TeamLogs from "./pages/TeamLogs";
+const ChatGPTUsage = lazy(() => import('@/pages/ChatGPTUsage'));
+const Profile = lazy(() => import('@/pages/Profile'));
 import NotFound from "./pages/NotFound";
 
 
@@ -52,29 +54,33 @@ const App = () => (
           <BrowserRouter>
             <HashRedirectHandler />
             <ReloadProtection />
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/password-reset" element={<PasswordReset />} />
-              <Route
-                element={
-                  <ProtectedRoute>
-                    <AppLayout />
-                  </ProtectedRoute>
-                }
-              >
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/tools" element={<Tools />} />
-                <Route path="/tools/:id" element={<ToolDetail />} />
-                <Route path="/requests" element={<Requests />} />
-                <Route path="/daily-journal" element={<DailyJournal />} />
-                <Route path="/team-logs" element={<TeamLogs />} />
-                <Route path="/pending-tools" element={<PendingTools />} />
-                <Route path="/users" element={<Users />} />
-                <Route path="/audit-logs" element={<AuditLogs />} />
-              </Route>
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <Suspense fallback={null}>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/password-reset" element={<PasswordReset />} />
+                <Route
+                  element={
+                    <ProtectedRoute>
+                      <AppLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/tools" element={<Tools />} />
+                  <Route path="/tools/:id" element={<ToolDetail />} />
+                  <Route path="/requests" element={<ProtectedRoute><Requests /></ProtectedRoute>} />
+                  <Route path="/daily-journal" element={<DailyJournal />} />
+                  <Route path="/team-logs" element={<TeamLogs />} />
+                  <Route path="/pending-tools" element={<PendingTools />} />
+                  <Route path="/users" element={<Users />} />
+                  <Route path="/audit-logs" element={<AuditLogs />} />
+                  <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+                  <Route path="/chatgpt-usage" element={<ProtectedRoute><ChatGPTUsage /></ProtectedRoute>} />
+                </Route>
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
           </BrowserRouter>
         </TooltipProvider>
       </NotificationProvider>

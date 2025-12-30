@@ -20,14 +20,23 @@ npx supabase functions deploy send-daily-prep-email
 Go to Supabase Dashboard → Edge Functions → Secrets and add:
 
 ```bash
-GEMINI_API_KEY=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
+# AWS Bedrock Configuration
+AWS_ACCESS_KEY_ID=YOUR_AWS_ACCESS_KEY_HERE
+AWS_SECRET_ACCESS_KEY=TSNiM/9etBzUPROVeHwFidzpODSCsKuVCMQoUupf
+AWS_REGION=us-east-1
+BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0
+
+# Email Service
 RESEND_API_KEY=re_X9Q6mVGi_KxXcugDF6RVBDZYhSzEafQLb
 ```
 
 Or use CLI:
 
 ```bash
-npx supabase secrets set GEMINI_API_KEY=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
+npx supabase secrets set AWS_ACCESS_KEY_ID=YOUR_AWS_ACCESS_KEY_HERE
+npx supabase secrets set AWS_SECRET_ACCESS_KEY=TSNiM/9etBzUPROVeHwFidzpODSCsKuVCMQoUupf
+npx supabase secrets set AWS_REGION=us-east-1
+npx supabase secrets set BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0
 npx supabase secrets set RESEND_API_KEY=re_X9Q6mVGi_KxXcugDF6RVBDZYhSzEafQLb
 ```
 
@@ -49,7 +58,7 @@ Or manually run the SQL in Supabase SQL Editor:
 2. **Database trigger fires** → Calls `send-daily-prep-email` Edge Function
 3. **Edge Function:**
    - Fetches log details (tool, tasks, blockers)
-   - Calls Gemini AI with your custom prompt
+   - Calls AWS Bedrock (Amazon Nova Lite) with your custom prompt
    - Generates professional standup prep
    - Sends email via Resend
 4. **User receives email** → Personalized standup prep in inbox
@@ -104,14 +113,15 @@ npx supabase functions logs send-daily-prep-email
 ```
 
 **Common issues:**
+- ❌ AWS credentials not set → Set secrets in Supabase dashboard
 - ❌ API keys not set → Set secrets in Supabase dashboard
 - ❌ Trigger not created → Run migration SQL
 - ❌ Email domain not verified → Use Resend test domain or verify your domain
 
-### Gemini AI errors?
+### AWS Bedrock errors?
 
-- Check API key is valid
-- Ensure you have quota/credits
+- Check AWS credentials are valid
+- Ensure you have access to the Bedrock model
 - Check function logs for specific error
 
 ### Database trigger not firing?
@@ -145,8 +155,6 @@ SELECT trigger_daily_prep_email();
 **Check email delivery:**
 - Resend Dashboard → Logs
 - See delivery status, opens, clicks
-
-**Check function invocations:**
 - Supabase Dashboard → Edge Functions → Metrics
 - See invocation count, errors, latency
 

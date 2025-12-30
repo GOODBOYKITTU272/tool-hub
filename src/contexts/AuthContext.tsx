@@ -17,9 +17,11 @@ interface AuthContextType {
     currentUser: User | null;
     session: Session | null;
     loading: boolean;
-    login: (email: string, password: string) => Promise<{ success: boolean; error?: string; needsPasswordReset?: boolean }>;
+    login: (email: string, password: string) => Promise<{ success: boolean; error?: string; needsPasswordReset?: boolean; mfaRequired?: boolean }>;
+    verifyMfa: (code: string) => Promise<{ success: boolean; error?: string }>;
     logout: () => Promise<void>;
     updatePassword: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
+    isMfaEnabled: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,6 +30,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
+    const [mfaChallengeId, setMfaChallengeId] = useState<string | null>(null);
+    const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
+    const [isMfaEnabled, setIsMfaEnabled] = useState(false);
     const authUpdateSeqRef = useRef(0);
     const inFlightProfileRef = useRef<Promise<User | null> | null>(null);
     const inFlightProfileUserIdRef = useRef<string | null>(null);
@@ -127,6 +132,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
 
+    // Helper to check MFA status
+    const checkMfaStatus = async () => {
+        try {
+            const { data, error } = await supabase.auth.mfa.listFactors();
+            if (error) throw error;
+            const totpFactor = data.all.find(f => f.factor_type === 'totp' && f.status === 'verified');
+            return !!totpFactor;
+        } catch (err) {
+            console.error('Error checking MFA status:', err);
+            return false;
+        }
+    };
+
     // Initialize auth state
     useEffect(() => {
         console.log('🚀 AuthContext initializing...');
@@ -149,6 +167,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setSession(session);
 
                 if (session?.user) {
+                    const mfaEnabled = await checkMfaStatus();
+                    if (isMounted) setIsMfaEnabled(mfaEnabled);
+
                     const cached = readCachedProfile(session.user.id);
                     if (cached) setCurrentUser(cached);
 
@@ -182,6 +203,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setSession(session);
 
             if (session?.user) {
+                const mfaEnabled = await checkMfaStatus();
+                if (isMounted) setIsMfaEnabled(mfaEnabled);
+
                 const cached = readCachedProfile(session.user.id);
                 if (cached) setCurrentUser(cached);
 
@@ -231,6 +255,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 return { success: false, error: 'Authentication failed: No user returned.' };
             }
 
+            // Check if MFA is required
+            const { data: mfaData, error: mfaError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+            if (mfaError) console.error('MFA Check Error:', mfaError);
+
+            if (mfaData?.nextLevel === 'aal2' && mfaData?.nextLevel !== mfaData?.currentLevel) {
+                // Get factors to find the TOTP one
+                const { data: factorsData, error: factorsError } = await supabase.auth.mfa.listFactors();
+                if (factorsError) return { success: false, error: factorsError.message };
+
+                const totpFactor = factorsData.all.find(f => f.factor_type === 'totp' && f.status === 'verified');
+                if (!totpFactor) {
+                    return { success: false, error: 'MFA required but no verified TOTP factor found.' };
+                }
+
+                // MFA is required. Create a challenge.
+                const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
+                    factorId: totpFactor.id
+                });
+
+                if (challengeError) {
+                    return { success: false, error: `MFA Challenge failed: ${challengeError.message}` };
+                }
+
+                setMfaChallengeId(challengeData.id);
+                setMfaFactorId(totpFactor.id);
+                return { success: true, mfaRequired: true };
+            }
+
             // Fetch user profile (10s timeout via fetchUserProfile)
             const profile = await fetchUserProfile(data.user.id);
 
@@ -259,6 +311,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 success: false,
                 error: error.message || 'An unexpected error occurred during login.',
             };
+        }
+    };
+
+    // Verify MFA function
+    const verifyMfa = async (code: string) => {
+        try {
+            if (!mfaChallengeId || !mfaFactorId) {
+                return { success: false, error: 'No active MFA challenge found.' };
+            }
+
+            const { error } = await supabase.auth.mfa.verify({
+                factorId: mfaFactorId,
+                challengeId: mfaChallengeId,
+                code: code
+            });
+
+            if (error) {
+                return { success: false, error: error.message };
+            }
+
+            setMfaChallengeId(null);
+            setMfaFactorId(null);
+
+            // Re-fetch profile now that we are fully authed
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const profile = await fetchUserProfile(user.id);
+                if (profile) setCurrentUser(profile);
+            }
+
+            // Re-check MFA status
+            const mfaStatus = await checkMfaStatus();
+            setIsMfaEnabled(mfaStatus);
+
+            return { success: true };
+        } catch (error: any) {
+            return { success: false, error: error.message || 'MFA verification failed.' };
         }
     };
 
@@ -314,8 +403,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         loading,
         login,
+        verifyMfa,
         logout,
         updatePassword,
+        isMfaEnabled,
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

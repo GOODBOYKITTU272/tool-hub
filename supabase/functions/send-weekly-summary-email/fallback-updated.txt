@@ -1,0 +1,70 @@
+// Fallback function that generates a narrative summary without AI
+function generateSimpleFallback(logs: any[]): string {
+    const sortedLogs = logs.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const logsByDay = sortedLogs.reduce((acc, log) => {
+        if (!acc[log.date]) acc[log.date] = [];
+        acc[log.date].push(log);
+        return acc;
+    }, {});
+    
+    const tools = Array.from(new Set(sortedLogs.map(log => log.tool?.name || 'Unknown')));
+    const toolName = tools.length === 1 ? tools[0] : tools.join(' and ');
+    const numDays = Object.keys(logsByDay).length;
+    const allTasks = sortedLogs.map(log => log.tasks_completed).filter(t => t);
+    const allBlockers = sortedLogs.map(log => log.blockers).filter(b => b);
+    const recurringBlockers = getRecurringBlockers(sortedLogs);
+    
+    let summary = `## 1. Progress Over the Last Few Days\n\n`;
+    summary += `Over the last ${numDays} day${numDays > 1 ? 's' : ''}, I've been working on ${toolName}. `;
+    
+    const collaborations = sortedLogs.filter(log => log.work_type !== 'own_tool');
+    if (collaborations.length > 0) {
+        const collaborators = Array.from(new Set(collaborations.map(log => log.owner?.name).filter(n => n)));
+        if (collaborators.length > 0) {
+            summary += `I collaborated with ${collaborators.join(' and ')} on this work. `;
+        }
+    }
+    
+    if (allTasks.length > 0) {
+        const firstTask = sortedLogs[0].tasks_completed;
+        summary += `I focused on ${firstTask.split('\n')[0].toLowerCase()}`;
+        if (allTasks.length > 1) summary += ` and made progress across multiple areas`;
+        summary += `. `;
+    }
+    
+    if (numDays > 1) {
+        summary += `The work has progressed steadily over these ${numDays} days. `;
+    }
+    
+    summary += `\n\n## 2. Ongoing Challenges or Blockers\n\n`;
+    
+    if (allBlockers.length > 0) {
+        if (recurringBlockers) {
+            summary += `There have been some recurring issues: ${recurringBlockers}. `;
+        } else {
+            summary += `${allBlockers[0]} `;
+        }
+    } else {
+        summary += `There are no ongoing blockers at the moment.`;
+    }
+    
+    summary += `\n\n## 3. Key Talking Points\n\n`;
+    summary += `• Worked on ${toolName}${collaborations.length > 0 ? ` with team collaboration` : ''}\n`;
+    if (allTasks.length > 0) summary += `• Completed: ${sortedLogs[0].tasks_completed.split('\n')[0]}\n`;
+    if (allBlockers.length > 0) {
+        summary += `• Blocked on: ${allBlockers[0].split('\n')[0]}\n`;
+    } else {
+        summary += `• No blockers, on track\n`;
+    }
+    if (numDays > 1) summary += `• Progress made across ${numDays} days\n`;
+    
+    summary += `\n## 4. What's Next\n\n`;
+    
+    if (allBlockers.length > 0) {
+        summary += `Address the identified blockers and continue progress on ${toolName}.`;
+    } else {
+        summary += `Continue building on the current progress with ${toolName}.`;
+    }
+    
+    return summary;
+}

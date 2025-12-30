@@ -7,7 +7,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-    const { currentUser, loading } = useAuth();
+    const { currentUser, loading, isMfaEnabled } = useAuth();
     const location = useLocation();
 
     if (loading) {
@@ -21,6 +21,11 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     if (!currentUser) {
         // Redirect to login but save the attempted location
         return <Navigate to="/login" state={{ from: location }} replace />;
+    }
+
+    // Force MFA enrollment
+    if (!isMfaEnabled && location.pathname !== '/profile') {
+        return <Navigate to="/profile" state={{ mfaRequired: true }} replace />;
     }
 
     return <>{children}</>;

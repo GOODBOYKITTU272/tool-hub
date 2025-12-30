@@ -2,212 +2,258 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 serve(async (req) => {
-    // Handle CORS preflight requests
-    if (req.method === 'OPTIONS') {
-        return new Response(null, { headers: corsHeaders });
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { log_id, user_id } = await req.json();
+
+    // Initialize Supabase client with better error handling
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+    console.log('Environment check:', {
+      hasUrl: !!supabaseUrl,
+      hasKey: !!supabaseKey,
+      urlPreview: supabaseUrl?.substring(0, 30) + '...',
+    });
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error(`Missing environment variables: URL=${!!supabaseUrl}, KEY=${!!supabaseKey}`);
     }
 
-    try {
-        const { log_id, user_id } = await req.json();
-
-        // Initialize Supabase client with better error handling
-        const supabaseUrl = Deno.env.get('SUPABASE_URL');
-        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-        console.log('Environment check:', {
-            hasUrl: !!supabaseUrl,
-            hasKey: !!supabaseKey,
-            urlPreview: supabaseUrl?.substring(0, 30) + '...',
-        });
-
-        if (!supabaseUrl || !supabaseKey) {
-            throw new Error(`Missing environment variables: URL=${!!supabaseUrl}, KEY=${!!supabaseKey}`);
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      db: { schema: 'public' },
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+      global: {
+        headers: {
+          'Authorization': `Bearer ${supabaseKey}`
         }
+      }
+    });
 
-        const supabase = createClient(supabaseUrl, supabaseKey, {
-            db: { schema: 'public' },
-            auth: {
-                persistSession: false,
-                autoRefreshToken: false,
-            },
-            global: {
-                headers: {
-                    'Authorization': `Bearer ${supabaseKey}`
-                }
-            }
-        });
+    console.log('Fetching log:', { log_id, user_id });
 
-        console.log('Fetching log:', { log_id, user_id });
-
-        // Fetch the daily log details
-        const { data: log, error: logError } = await supabase
-            .from('daily_logs')
-            .select(`
+    // Fetch the daily log details
+    const { data: log, error: logError } = await supabase
+      .from('daily_logs')
+      .select(`
         *,
         tool:tools!daily_logs_tool_id_fkey(name),
         owner:users!daily_logs_tool_owner_id_fkey(name),
         user:users!daily_logs_user_id_fkey(name, email)
       `)
-            .eq('id', log_id)
-            .single();
+      .eq('id', log_id)
+      .single();
 
-        if (logError) {
-            console.error('Database error:', logError);
-            throw logError;
-        }
-
-        if (!log) {
-            throw new Error(`No log found with id: ${log_id}`);
-        }
-
-        console.log('Log fetched successfully:', { logId: log.id, userId: log.user_id });
-
-        // Generate AI standup prep using AWS Bedrock (Amazon Nova)
-        const standupPrep = await generateStandupPrep(log);
-
-        // Send email using Resend
-        const resendApiKey = Deno.env.get('RESEND_API_KEY')!;
-        await sendEmail(log.user.email, log.user.name, standupPrep, resendApiKey);
-
-        return new Response(
-            JSON.stringify({ success: true, message: 'Email sent successfully' }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-    } catch (error) {
-        console.error('Error:', error);
-        return new Response(
-            JSON.stringify({ error: error.message }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+    if (logError) {
+      console.error('Database error:', logError);
+      throw logError;
     }
+
+    if (!log) {
+      throw new Error(`No log found with id: ${log_id}`);
+    }
+
+    console.log('Log fetched successfully:', { logId: log.id, userId: log.user_id });
+
+    // Generate AI standup prep using AWS Bedrock (Amazon Nova)
+    const standupPrep = await generateStandupPrep(log, supabase);
+
+    // Send email using Resend
+    const resendApiKey = Deno.env.get('RESEND_API_KEY')!;
+    await sendEmail(log.user.email, log.user.name, standupPrep, resendApiKey);
+
+    return new Response(
+      JSON.stringify({ success: true, message: 'Email sent successfully' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  } catch (error) {
+    console.error('Error:', error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
 });
 
-async function generateStandupPrep(log: any): Promise<string> {
-    const workType = log.work_type === 'own_tool'
-        ? `Working on my own tool`
-        : `Collaborated with ${log.owner?.name || 'team member'}`;
+async function generateStandupPrep(log: any, supabase: any): Promise<string> {
+  const workType = log.work_type === 'own_tool'
+    ? `Working on my own tool`
+    : `Collaborated with ${log.owner?.name || 'team member'}`;
 
-    const prompt = `📌 STANDUP REPORT GENERATION PROMPT
+  const prompt = `🎯 DAILY STANDUP PREP — RACE FRAMEWORK
 
-Role:
-You are an experienced software engineer with 10 years of industry experience. You speak with the CTO every day and are expected to give clear, confident, and structured standup updates.
+R — ROLE
 
-Task:
-Prepare a detailed daily standup report based on the input data provided.
+You are a senior software engineer with 10+ years of experience.
+- You report to the CTO daily
+- You give clear, confident standup updates
+- You speak simply and professionally
+- You never exaggerate
 
-Input Data:
-- Tool name: ${log.tool?.name || 'Unknown'}
-- Work type: ${workType}
-- Accomplishments (what was completed today): ${log.tasks_completed}
-- Blockers or challenges (if any): ${log.blockers || 'None'}
+A — ACTION (WHAT YOU MUST DO)
 
-Instructions:
-- Use a professional but conversational tone
-- Keep the language simple and clear (avoid heavy technical jargon)
-- Assume the audience is the CTO, who wants clarity, not details overload
-- The response should be suitable for speaking aloud
-- Total speaking time should be within 3 minutes
-- Focus on outcomes and progress, not step-by-step implementation
-- If there are no blockers, clearly state that there are none
-- Do not exaggerate or add work that was not provided in the input
+Generate a standup preparation summary that helps the engineer:
+1. Speak confidently in tomorrow's standup meeting
+2. Explain today's work clearly and concisely
+3. Be ready for follow-up questions
 
-Output Format (Strictly Follow This Structure):
+This is for SPOKEN DELIVERY in a 2-3 minute standup.
 
-**What I Accomplished Today:**
-- Clearly explain what work was done today
-- Mention the tool name naturally in the explanation
-- Keep sentences short and confident
-- Focus on completion and progress
+C — CONTEXT (INPUT DATA)
 
-**Challenges & Blockers:**
-- Clearly mention any blockers or challenges
-- If there are no blockers, explicitly say: "There are no blockers at the moment."
+Tool: ${log.tool?.name || 'Unknown'}
+Work Type: ${workType}
+What Was Completed Today: ${log.tasks_completed}
+Blockers/Challenges: ${log.blockers || 'None'}
 
-**Key Talking Points for Standup:**
-- 2–4 concise points the engineer can confidently say in the meeting
-- These should sound natural when spoken
-- Should help the speaker stay calm and focused
+⚠️ Do not add anything beyond the provided input.
 
-Tone Example:
-Calm, confident, and prepared — like someone who knows their work and is comfortable explaining it to leadership.
+E — EXPECTATION (OUTPUT REQUIREMENTS)
 
-Goal of the Output:
-Help the engineer walk into the standup meeting fully prepared, speak clearly without stress, and give the CTO exactly the information they need.`;
+Generate output in this exact structure:
 
-    // Try to use AWS Bedrock for AI-generated content
-    try {
-        const awsRegion = Deno.env.get('AWS_REGION') || 'us-east-1';
-        const modelId = Deno.env.get('BEDROCK_MODEL_ID') || 'us.amazon.nova-lite-v1:0';
+## What I Accomplished Today
 
-        console.log('🤖 Calling AWS Bedrock for AI standup prep');
+Write 2-3 sentences explaining:
+- What work was done today
+- Mention the tool name naturally
+- Focus on outcomes and completion
+- Keep it conversational and confident
 
-        // Import AWS SDK v3 for Bedrock Runtime
-        const { BedrockRuntimeClient, InvokeModelCommand } = await import('npm:@aws-sdk/client-bedrock-runtime@3');
+Example tone:
+"Today I worked on ${log.tool?.name || 'the project'}. I completed [task] and made progress on [area]. The [feature/component] is now [stable/working/complete]."
 
-        const client = new BedrockRuntimeClient({
-            region: awsRegion,
-            credentials: {
-                accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID') || '',
-                secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY') || '',
-            }
-        });
+## Challenges & Blockers
 
-        const payload = {
-            messages: [
-                {
-                    role: 'user',
-                    content: [{ text: prompt }]
-                }
-            ],
-            inferenceConfig: {
-                maxTokens: 1000,
-                temperature: 0.7,
-                topP: 0.9
-            }
-        };
+${log.blockers ? 'State the blocker clearly and directly.' : 'If no blockers, say exactly: "There are no blockers at the moment."'}
+Do not over-explain. Be factual.
 
-        const command = new InvokeModelCommand({
-            modelId: modelId,
-            contentType: 'application/json',
-            accept: 'application/json',
-            body: JSON.stringify(payload)
-        });
+## Key Talking Points for Standup
 
-        const response = await client.send(command);
-        const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+Provide 2-4 short bullets that:
+- Sound natural when spoken aloud
+- Help the engineer stay calm and focused
+- Cover the main accomplishment and any blockers
 
-        console.log('✅ Bedrock response received');
+Example format:
+• Completed [specific outcome]
+• [Tool/feature] is now stable
+• ${log.blockers ? 'Blocked on [specific issue]' : 'No blockers, on track'}
 
-        // Extract the generated text from Nova response
-        const generatedText = responseBody.output?.message?.content?.[0]?.text;
+🚫 HARD RULES
 
-        if (generatedText) {
-            console.log('🎯 Using AI-generated standup prep');
-            return generatedText;
-        } else {
-            console.warn('⚠️ No text in Bedrock response, using fallback');
-            return generateSimpleFallback(log);
-        }
+- Use simple, confident English
+- No jargon or technical details
+- No greetings or filler
+- Total speaking time: under 3 minutes
+- Do not exaggerate or invent work
+- Focus on what's DONE, not how it was done
 
-    } catch (error) {
-        console.error('❌ AWS Bedrock error:', error.message);
-        console.log('📧 Falling back to formatted template');
-        return generateSimpleFallback(log);
+🎯 FINAL GOAL
+
+Help the engineer walk into standup:
+- Fully prepared
+- Speaking clearly without stress
+- Giving the CTO exactly what they need to know`;
+
+  // Try to use OpenAI for AI-generated content
+  try {
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+
+    if (!openaiApiKey) {
+      console.log('OpenAI API key not found, using fallback');
+      return generateSimpleFallback(log);
     }
+
+    console.log('🤖 Calling OpenAI for AI standup prep');
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openaiApiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-3.5-turbo',
+        messages: [
+          { role: 'system', content: 'You are a professional technical writer helping engineers prepare for standup meetings.' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('OpenAI request failed:', response.status, await response.text());
+      return generateSimpleFallback(log);
+    }
+
+    const data = await response.json();
+    const generatedText = data.choices?.[0]?.message?.content;
+
+    if (generatedText) {
+      console.log('🎯 Using AI-generated standup prep');
+
+      // Log usage to database
+      try {
+        const usage = data.usage;
+        if (usage) {
+          const inputTokens = usage.prompt_tokens || 0;
+          const outputTokens = usage.completion_tokens || 0;
+          const totalTokens = usage.total_tokens || 0;
+          const estimatedCost = (inputTokens * 0.0000015) + (outputTokens * 0.000002);
+
+          await supabase
+            .from('openai_usage')
+            .insert({
+              feature: 'daily-email',
+              user_id: log.user_id,
+              model: 'gpt-3.5-turbo',
+              input_tokens: inputTokens,
+              output_tokens: outputTokens,
+              total_tokens: totalTokens,
+              estimated_cost: estimatedCost
+            });
+
+          console.log(`📊 Logged usage: ${totalTokens} tokens, $${estimatedCost.toFixed(6)}`);
+        }
+      } catch (logError) {
+        console.error('Failed to log usage (non-critical):', logError);
+      }
+
+      return generatedText.trim();
+    } else {
+      console.warn('⚠️ No text in OpenAI response, using fallback');
+      return generateSimpleFallback(log);
+    }
+
+  } catch (error) {
+    console.error('❌ OpenAI error:', error.message);
+    console.log('📧 Falling back to formatted template');
+    return generateSimpleFallback(log);
+  }
 }
 
-// Fallback function - creates nicely formatted email
+// Fallback function for when AI is unavailablely formatted email
 function generateSimpleFallback(log: any): string {
-    const workType = log.work_type === 'own_tool'
-        ? 'my own tool'
-        : `collaboration with ${log.owner?.name || 'team member'}`;
+  const workType = log.work_type === 'own_tool'
+    ? 'my own tool'
+    : `collaboration with ${log.owner?.name || 'team member'}`;
 
-    return `**What I Accomplished Today:**
+  return `**What I Accomplished Today:**
 ${log.tasks_completed}
 
 **Challenges & Blockers:**
@@ -220,30 +266,30 @@ ${log.blockers || 'No blockers reported'}
 }
 
 async function sendEmail(
-    toEmail: string,
-    toName: string,
-    standupPrep: string,
-    apiKey: string
+  toEmail: string,
+  toName: string,
+  standupPrep: string,
+  apiKey: string
 ): Promise<void> {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const dateStr = tomorrow.toLocaleDateString('en-US', {
-        weekday: 'long',
-        month: 'long',
-        day: 'numeric'
-    });
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const dateStr = tomorrow.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric'
+  });
 
-    const response = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-            from: 'Tool Hub <onboarding@resend.dev>', // Use Resend test domain
-            to: [toEmail],
-            subject: `🎯 Tomorrow's Standup Prep - ${dateStr}`,
-            html: `
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      from: 'Tool Hub <onboarding@resend.dev>', // Use Resend test domain
+      to: [toEmail],
+      subject: `🎯 Tomorrow's Standup Prep - ${dateStr}`,
+      html: `
         <!DOCTYPE html>
         <html>
         <head>
@@ -252,117 +298,159 @@ async function sendEmail(
               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
               line-height: 1.6; 
               color: #1f2937;
-              background-color: #f3f4f6;
+              background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
               margin: 0;
-              padding: 20px;
+              padding: 40px 20px;
             }
             .email-wrapper {
-              background-color: #f3f4f6;
-              padding: 20px 0;
+              max-width: 650px;
+              margin: 0 auto;
             }
             .container { 
-              max-width: 600px; 
-              margin: 0 auto; 
               background: white;
-              border-radius: 8px;
+              border-radius: 16px;
               overflow: hidden;
+              box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
             }
             .header {
               background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-              padding: 40px 30px;
+              padding: 48px 40px;
               text-align: center;
+              position: relative;
+              overflow: hidden;
+            }
+            .header::before {
+              content: '';
+              position: absolute;
+              top: 0;
+              left: 0;
+              right: 0;
+              bottom: 0;
+              background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="10" cy="10" r="1" fill="white" opacity="0.1"/></svg>') repeat;
+              opacity: 0.3;
             }
             .header h1 {
               color: white;
-              margin: 0 0 10px 0;
-              font-size: 32px;
-              font-weight: 700;
-              letter-spacing: -0.5px;
+              margin: 0 0 12px 0;
+              font-size: 36px;
+              font-weight: 800;
+              letter-spacing: -1px;
+              position: relative;
+              text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
             }
             .header p {
               color: rgba(255, 255, 255, 0.95);
               margin: 0;
-              font-size: 16px;
+              font-size: 17px;
               font-weight: 500;
+              position: relative;
             }
             .content {
-              padding: 40px 30px;
+              padding: 48px 40px;
             }
             .greeting {
-              font-size: 24px;
+              font-size: 28px;
               color: #111827;
-              margin-bottom: 10px;
-              font-weight: 600;
+              margin-bottom: 12px;
+              font-weight: 700;
+              background: linear-gradient(135deg, #667eea, #764ba2);
+              -webkit-background-clip: text;
+              -webkit-text-fill-color: transparent;
+              background-clip: text;
             }
             .intro {
               color: #6b7280;
-              margin-bottom: 30px;
-              font-size: 15px;
-              line-height: 1.5;
+              margin-bottom: 32px;
+              font-size: 16px;
+              line-height: 1.6;
             }
             .quote-box {
               background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
               border-left: 4px solid #f59e0b;
-              padding: 20px 25px;
-              border-radius: 6px;
-              margin: 30px 0;
+              padding: 24px 28px;
+              border-radius: 12px;
+              margin: 32px 0;
               font-style: italic;
               color: #92400e;
+              box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);
+              position: relative;
+            }
+            .quote-box::before {
+              content: '"';
+              font-size: 60px;
+              position: absolute;
+              top: 10px;
+              left: 15px;
+              opacity: 0.2;
+              font-family: Georgia, serif;
             }
             .quote-text {
-              font-size: 16px;
-              line-height: 1.6;
-              margin: 0 0 8px 0;
+              font-size: 17px;
+              line-height: 1.7;
+              margin: 0 0 12px 0;
               font-weight: 500;
+              position: relative;
+              z-index: 1;
             }
             .quote-author {
               font-size: 14px;
               text-align: right;
-              opacity: 0.8;
+              opacity: 0.85;
               font-weight: 600;
             }
             .prep-section {
-              background: #f9fafb;
-              border: 1px solid #e5e7eb;
-              border-radius: 8px;
-              padding: 25px;
-              margin: 25px 0;
+              background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
+              border: 2px solid #e5e7eb;
+              border-radius: 12px;
+              padding: 28px 32px;
+              margin: 28px 0;
+              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+              transition: transform 0.2s, box-shadow 0.2s;
+            }
+            .prep-section:hover {
+              transform: translateY(-2px);
+              box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08);
             }
             .prep-section h3 {
               color: #111827;
-              margin: 0 0 15px 0;
-              font-size: 16px;
-              font-weight: 600;
+              margin: 0 0 16px 0;
+              font-size: 18px;
+              font-weight: 700;
               display: flex;
               align-items: center;
-              gap: 8px;
+              gap: 10px;
+              border-bottom: 2px solid #e5e7eb;
+              padding-bottom: 12px;
             }
             .prep-section p {
               color: #374151;
-              margin: 8px 0;
+              margin: 10px 0;
               font-size: 15px;
-              line-height: 1.7;
+              line-height: 1.8;
               white-space: pre-wrap;
             }
             .tip-box {
-              background: #eff6ff;
-              border: 1px solid #bfdbfe;
-              padding: 20px;
-              border-radius: 8px;
-              margin: 25px 0;
+              background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+              border: 2px solid #93c5fd;
+              padding: 24px 28px;
+              border-radius: 12px;
+              margin: 32px 0;
+              box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
             }
             .tip-box strong {
               color: #1e40af;
-              font-size: 15px;
+              font-size: 17px;
+              font-weight: 700;
             }
             .tip-box p {
               color: #1e40af;
-              margin: 5px 0 0 0;
-              font-size: 14px;
+              margin: 8px 0 0 0;
+              font-size: 15px;
+              line-height: 1.6;
             }
             .footer {
-              background: #f9fafb;
-              padding: 30px;
+              background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+              padding: 32px 40px;
               text-align: center;
               border-top: 1px solid #e5e7eb;
             }
@@ -370,15 +458,20 @@ async function sendEmail(
               color: #9ca3af;
               font-size: 13px;
               margin: 0;
+              line-height: 1.6;
             }
             .footer a {
               color: #667eea;
               text-decoration: none;
+              font-weight: 600;
+            }
+            .footer a:hover {
+              text-decoration: underline;
             }
             hr {
               border: none;
-              border-top: 1px solid #e5e7eb;
-              margin: 25px 0;
+              border-top: 2px solid #e5e7eb;
+              margin: 28px 0;
             }
           </style>
         </head>
@@ -404,6 +497,7 @@ async function sendEmail(
                 
                 <div class="prep-section">
                   ${standupPrep.replace(/\*\*([^*]+)\*\*/g, '<h3>$1</h3>').replace(/\n/g, '<br>')}
+
                 </div>
                 
                 <div class="tip-box">
@@ -425,11 +519,11 @@ async function sendEmail(
         </body>
         </html>
       `,
-        }),
-    });
+    }),
+  });
 
-    if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Failed to send email: ${error}`);
-    }
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to send email: ${error}`);
+  }
 }
