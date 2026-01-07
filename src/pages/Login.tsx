@@ -11,14 +11,12 @@ import { useAuth } from '@/contexts/AuthContext';
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [mfaCode, setMfaCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [step, setStep] = useState<'credentials' | 'mfa'>('credentials');
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { login, verifyMfa } = useAuth();
+  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,19 +30,10 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      // Authenticate with Supabase
+      // Authenticate with Supabase (no MFA)
       const result = await login(email, password);
 
       if (result.success) {
-        if (result.mfaRequired) {
-          setStep('mfa');
-          toast({
-            title: 'Second Step Required',
-            description: 'Please enter the code from your Authenticator app.',
-          });
-          return;
-        }
-
         toast({
           title: 'Welcome back!',
           description: 'You have successfully logged in.',
