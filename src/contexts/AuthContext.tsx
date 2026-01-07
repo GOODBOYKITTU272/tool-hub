@@ -314,10 +314,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     return { success: false, error: 'MFA required but no verified TOTP factor found.' };
                 }
 
-                // MFA is required. Create a challenge.
-                const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
-                    factorId: totpFactor.id
-                });
+                // MFA is required. Create a challenge with timeout.
+                const { data: challengeData, error: challengeError } = await withTimeout(
+                    supabase.auth.mfa.challenge({
+                        factorId: totpFactor.id
+                    }),
+                    10000,
+                    'MFA challenge creation timed out'
+                ) as { data: any, error: any };
 
                 if (challengeError) {
                     return { success: false, error: `MFA Challenge failed: ${challengeError.message}` };
@@ -414,22 +418,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 }
 
                 setMfaChallengeId(newChallenge.id);
-                console.log('🔐 [MFA] Retrying verification with new challenge...');
+                console.log('✅ [MFA] Fresh challenge ready. User must enter NEW code.');
 
-                // Retry verification with new challenge
-                const { error: retryError } = await withTimeout(
-                    supabase.auth.mfa.verify({
-                        factorId: mfaFactorId,
-                        challengeId: newChallenge.id,
-                        code: code
-                    }),
-                    15000,
-                    'MFA retry verification timed out'
-                ) as { error: any };
-
-                if (retryError) {
-                    return { success: false, error: retryError.message || 'Invalid code. Please try again.' };
-                }
+                // CRITICAL FIX: Don't retry with stale TOTP code (changes every 30s)
+                // User must enter fresh code from authenticator for new challenge
+                return {
+                    success: false,
+                    error: 'Code expired. Please enter a fresh code from your authenticator app.'
+                };
             } else if (error) {
                 return { success: false, error: error.message || 'Invalid verification code.' };
             }
