@@ -106,14 +106,14 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center p-4">
       <Card className="w-full max-w-md animate-scale-in">
         <CardHeader className="text-center pb-2">
-          <div className="mx-auto mb-4 w-12 h-12 bg-primary rounded-xl flex items-center justify-center">
-            <Wrench className="w-7 h-7 text-primary-foreground" />
+          <div className="mx-auto mb-4 w-12 h-12 bg-[#d946ef] rounded-[14px] flex items-center justify-center shadow-lg shadow-magenta-500/20">
+            <Wrench className="w-7 h-7 text-white" />
           </div>
-          <CardTitle className="text-2xl font-display">Welcome Back</CardTitle>
+          <CardTitle className="text-2xl font-bold tracking-tight text-slate-900 mb-1">Welcome Back</CardTitle>
           <CardDescription className="space-y-1">
-            <div>Sign in to access your tool management dashboard</div>
-            <div className="text-xs font-medium text-primary mt-2 bg-primary/10 px-3 py-1.5 rounded-md inline-block">
-              🔒 ApplyWizz Team Only • @applywizz.com emails required
+            <div className="text-[15px] text-slate-600">Sign in to access your tool management dashboard</div>
+            <div className="text-xs font-bold text-[#d131b7] mt-3 bg-[#fce7f3] px-3 py-1.5 rounded-full inline-flex items-center gap-1.5">
+              <span>🔒</span> ApplyWizz Team Only • @applywizz.com emails required
             </div>
           </CardDescription>
         </CardHeader>
@@ -183,14 +183,14 @@ export default function Login() {
               </Button>
             </form>
           ) : (
-            <form onSubmit={handleMfaSubmit} className="space-y-4">
-              <div className="mx-auto mb-4 w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
-                <Lock className="w-6 h-6 text-primary" />
+            <form onSubmit={handleMfaSubmit} className="space-y-5">
+              <div className="mx-auto mb-6 w-14 h-14 bg-[#fdf2f8] rounded-2xl flex items-center justify-center border border-pink-100">
+                <Lock className="w-7 h-7 text-[#d946ef]" />
               </div>
-              <div className="text-center space-y-1 mb-6">
-                <h3 className="font-semibold text-lg">Verification Required</h3>
-                <p className="text-sm text-muted-foreground">
-                  Open your <strong>Microsoft Authenticator</strong> app and enter the 6-digit security code.
+              <div className="text-center space-y-1 mb-8">
+                <h3 className="font-bold text-xl text-slate-900">Verification Required</h3>
+                <p className="text-[14px] text-slate-500 leading-relaxed px-4">
+                  Open your <strong className="text-slate-900">Microsoft Authenticator</strong> app and enter the 6-digit security code.
                 </p>
               </div>
 
@@ -217,7 +217,7 @@ export default function Login() {
 
               <Button
                 type="submit"
-                className="w-full"
+                className="w-full bg-[#f472b6] hover:bg-[#ec4899] text-white font-bold h-12 transition-all shadow-md active:scale-[0.98]"
                 size="lg"
                 disabled={isLoading || mfaCode.length < 6}
               >
