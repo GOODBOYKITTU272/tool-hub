@@ -126,7 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // 30 second timeout for profile fetch (cold starts)
             const profileRes = await withTimeout(
                 fetchPromise,
-                30000,
+                45000, // Increased from 30s to 45s for slower environments
                 'Profile fetch timed out'
             ) as { data: any, error: any };
 
