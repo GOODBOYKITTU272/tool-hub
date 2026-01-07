@@ -187,11 +187,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const initAuth = async () => {
             try {
-                // Get initial session with 30s timeout + retry (increased for cold starts)
+                // Get initial session with 15s timeout + retry (balanced for performance/reliability)
                 const sessionRes = await withRetry(() =>
                     withTimeout(
                         supabase.auth.getSession(),
-                        30000,
+                        15000,
                         'Session check timed out'
                     )
                 ) as { data: { session: Session | null }, error: any };
@@ -370,10 +370,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             let currentChallengeId = mfaChallengeId;
             if (!currentChallengeId) {
                 console.log('🔄 [MFA] Creating new challenge...');
-                const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
-                    factorId: mfaFactorId
-                });
+                const { data: challengeData, error: challengeError } = await withTimeout(
+                    supabase.auth.mfa.challenge({
+                        factorId: mfaFactorId
+                    }),
+                    10000,
+                    'MFA challenge timed out'
+                ) as { data: any, error: any };
+
                 if (challengeError) {
+                    console.error('❌ [MFA] Challenge creation error:', challengeError);
                     return { success: false, error: `Failed to create MFA challenge: ${challengeError.message}` };
                 }
                 currentChallengeId = challengeData.id;
@@ -381,30 +387,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
 
             console.log('🔐 [MFA] Verifying code...');
-            const { error } = await supabase.auth.mfa.verify({
-                factorId: mfaFactorId,
-                challengeId: currentChallengeId,
-                code: code
-            });
+            const { error } = await withTimeout(
+                supabase.auth.mfa.verify({
+                    factorId: mfaFactorId,
+                    challengeId: currentChallengeId,
+                    code: code
+                }),
+                15000,
+                'MFA verification timed out. Please try again.'
+            ) as { error: any };
 
             // If verification failed due to expired challenge, create new challenge and retry
             if (error && (error.message.includes('expired') || error.status === 422)) {
                 console.log('🔄 [MFA] Challenge expired, creating new one...');
-                const { data: newChallenge, error: newChallengeError } = await supabase.auth.mfa.challenge({
-                    factorId: mfaFactorId
-                });
+                const { data: newChallenge, error: newChallengeError } = await withTimeout(
+                    supabase.auth.mfa.challenge({
+                        factorId: mfaFactorId
+                    }),
+                    10000,
+                    'MFA challenge creation timed out'
+                ) as { data: any, error: any };
+
                 if (newChallengeError) {
+                    console.error('❌ [MFA] New challenge failed:', newChallengeError);
                     return { success: false, error: 'MFA challenge expired. Please try again.' };
                 }
 
                 setMfaChallengeId(newChallenge.id);
+                console.log('🔐 [MFA] Retrying verification with new challenge...');
 
                 // Retry verification with new challenge
-                const { error: retryError } = await supabase.auth.mfa.verify({
-                    factorId: mfaFactorId,
-                    challengeId: newChallenge.id,
-                    code: code
-                });
+                const { error: retryError } = await withTimeout(
+                    supabase.auth.mfa.verify({
+                        factorId: mfaFactorId,
+                        challengeId: newChallenge.id,
+                        code: code
+                    }),
+                    15000,
+                    'MFA retry verification timed out'
+                ) as { error: any };
 
                 if (retryError) {
                     return { success: false, error: retryError.message || 'Invalid code. Please try again.' };
