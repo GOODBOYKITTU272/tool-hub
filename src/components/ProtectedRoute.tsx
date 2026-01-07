@@ -32,11 +32,14 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
         return <Navigate to="/login" state={{ from: location }} replace />;
     }
 
-    // Force MFA enrollment
+    // TEMPORARY: MFA enforcement disabled due to timeout issues
+    // Re-enable after fixing MFA timeout problems
+    /*
     if (!isMfaEnabled && location.pathname !== '/profile') {
         console.log('⚠️ [ProtectedRoute] MFA not enabled, redirecting to /profile');
         return <Navigate to="/profile" state={{ mfaRequired: true }} replace />;
     }
+    */
 
     console.log('✅ [ProtectedRoute] Access granted');
     return <>{children}</>;
