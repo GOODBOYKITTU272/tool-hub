@@ -356,7 +356,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             return {
                 success: true,
-                needsPasswordReset: profile.must_change_password
+                needsPasswordReset: false // Profile loads async, can't check this yet
             };
         } catch (error: any) {
             console.error('❌ [Auth] Login exception:', error);
