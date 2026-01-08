@@ -340,7 +340,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     // User exists in auth but not in public.users
                     withTimeout(supabase.auth.signOut(), 3000, 'Signout timeout').catch(() => { });
                     setCurrentUser(null);
-                    setError('User profile not found. Please contact your administrator.');
                     return;
                 }
 
