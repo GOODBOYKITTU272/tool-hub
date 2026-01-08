@@ -332,22 +332,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 return { success: true, mfaRequired: true };
             }
 
-            // Fetch user profile (30s timeout via fetchUserProfile)
-            const profile = await fetchUserProfile(data.user.id);
+            // Fetch user profile asynchronously (don't block login completion)
+            // This allows login to succeed immediately while profile loads in background
+            fetchUserProfile(data.user.id).then((profile) => {
+                if (!profile) {
+                    console.warn('⚠️ [Auth] Profile not found after login, signing out...');
+                    // User exists in auth but not in public.users
+                    withTimeout(supabase.auth.signOut(), 3000, 'Signout timeout').catch(() => { });
+                    setCurrentUser(null);
+                    setError('User profile not found. Please contact your administrator.');
+                    return;
+                }
 
-            if (!profile) {
-                // User exists in auth but not in public.users - try to sign out quickly
-                try {
-                    await withTimeout(supabase.auth.signOut(), 3000, 'Signout timeout');
-                } catch { /* ignore signout error */ }
+                console.log('✅ [Auth] Profile loaded:', profile.name);
+                setCurrentUser(profile);
+            }).catch((err) => {
+                console.error('❌ [Auth] Profile fetch failed:', err);
+                // Set minimal user data to allow partial functionality
+                setCurrentUser({
+                    id: data.user.id,
+                    email: data.user.email || '',
+                    name: data.user.email?.split('@')[0] || 'User',
+                    role: 'Observer', // Default to lowest privilege
+                    must_change_password: false,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                });
+            });
 
-                return {
-                    success: false,
-                    error: 'User profile not found. This usually means your profile was deleted. Please contact your administrator to recreate it.',
-                };
-            }
-
-            setCurrentUser(profile);
+            // Return success immediately, don't wait for profile
             setSession(data.session);
 
             return {
