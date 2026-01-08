@@ -454,15 +454,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    // Logout function
+    // Logout function - Robust cleanup to prevent stale session issues
     const logout = async () => {
         try {
-            await withTimeout(supabase.auth.signOut(), 5000, 'Signout timed out');
-        } catch (error) {
-            console.error('Logout error:', error);
-        } finally {
+            console.log('🚪 [Auth] Starting logout process...');
+
+            // Step 1: Sign out from Supabase
+            try {
+                await withTimeout(supabase.auth.signOut(), 5000, 'Signout timed out');
+                console.log('✅ [Auth] Supabase signOut complete');
+            } catch (error) {
+                console.error('⚠️ [Auth] Supabase signOut error (continuing anyway):', error);
+                // Continue with cleanup even if signOut fails
+            }
+
+            // Step 2: Explicitly clear ALL auth-related localStorage keys
+            // This prevents stale sessions from interfering with re-login
+            console.log('🧹 [Auth] Clearing localStorage...');
+            const keys = Object.keys(localStorage);
+            let clearedCount = 0;
+
+            keys.forEach(key => {
+                // Clear keys related to our app or Supabase
+                if (
+                    key.startsWith('tool-hub') ||
+                    key.startsWith('supabase') ||
+                    key.startsWith('sb-') ||
+                    key.includes('auth')
+                ) {
+                    console.log(`  ↳ Removing: ${key}`);
+                    localStorage.removeItem(key);
+                    clearedCount++;
+                }
+            });
+
+            console.log(`✅ [Auth] Cleared ${clearedCount} localStorage keys`);
+
+            // Step 3: Reset all React state
             setCurrentUser(null);
             setSession(null);
+            setIsMfaEnabled(false);
+            setMfaFactorId(null);
+            setMfaChallengeId(null);
+            setLoading(false);
+            console.log('✅ [Auth] React state reset');
+
+            // Step 4: Force navigation to login page (hard refresh)
+            // Using window.location ensures complete state reset
+            console.log('🔄 [Auth] Redirecting to login...');
+            window.location.href = '/login';
+
+        } catch (error) {
+            console.error('❌ [Auth] Logout failed catastrophically:', error);
+
+            // Emergency cleanup - clear everything and redirect
+            console.error('🆘 [Auth] Performing emergency cleanup...');
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+            } catch (storageError) {
+                console.error('Failed to clear storage:', storageError);
+            }
+
+            // Force redirect even if cleanup failed
+            window.location.href = '/login';
         }
     };
 
