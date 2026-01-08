@@ -56,40 +56,6 @@ export default function Login() {
     }
   };
 
-  const handleMfaSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    if (!mfaCode || mfaCode.length < 6) {
-      setError('Please enter a valid 6-digit security code');
-      return;
-    }
-
-    console.log('🔐 [Login] Starting MFA verification...');
-    setIsLoading(true);
-    try {
-      const result = await verifyMfa(mfaCode);
-      console.log('🔍 [Login] MFA Result:', result);
-
-      if (result.success) {
-        console.log('✅ [Login] MFA verified successfully, navigating to dashboard...');
-        toast({
-          title: 'Welcome back!',
-          description: 'MFA Verification successful.',
-        });
-        navigate('/dashboard');
-        console.log('🚀 [Login] Navigation triggered');
-      } else {
-        console.error('❌ [Login] MFA verification failed:', result.error);
-        setError(result.error || 'Invalid security code');
-      }
-    } catch (err) {
-      console.error('❌ [Login] MFA exception:', err);
-      setError('MFA verification failed. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
@@ -107,134 +73,69 @@ export default function Login() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {step === 'credentials' ? (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="yourname@applywizz.com"
-                  pattern=".*@applywizz\.com$"
-                  title="Please use your @applywizz.com email address"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={isLoading}
-                  autoComplete="email"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    disabled={isLoading}
-                    autoComplete="current-password"
-                    className="pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    tabIndex={-1}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {error && (
-                <p className="text-sm text-destructive animate-fade-in">{error}</p>
-              )}
-
-              <Button
-                type="submit"
-                className="w-full"
-                size="lg"
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="yourname@applywizz.com"
+                pattern=".*@applywizz\.com$"
+                title="Please use your @applywizz.com email address"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Signing in...
-                  </>
-                ) : (
-                  'Sign In'
-                )}
-              </Button>
-            </form>
-          ) : (
-            <form onSubmit={handleMfaSubmit} className="space-y-5">
-              <div className="mx-auto mb-6 w-14 h-14 bg-[#fdf2f8] rounded-2xl flex items-center justify-center border border-pink-100">
-                <Lock className="w-7 h-7 text-[#d946ef]" />
-              </div>
-              <div className="text-center space-y-1 mb-8">
-                <h3 className="font-bold text-xl text-slate-900">Verification Required</h3>
-                <p className="text-[14px] text-slate-500 leading-relaxed px-4">
-                  Open your <strong className="text-slate-900">Microsoft Authenticator</strong> app and enter the 6-digit security code.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="mfaCode">Security Code</Label>
+                autoComplete="email"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <div className="relative">
                 <Input
-                  id="mfaCode"
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  maxLength={6}
-                  placeholder="000000"
-                  className="text-center text-2xl tracking-[0.5em] font-mono"
-                  value={mfaCode}
-                  onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ''))}
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   disabled={isLoading}
-                  autoFocus
+                  autoComplete="current-password"
+                  className="pr-10"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
               </div>
+            </div>
 
-              {error && (
-                <p className="text-sm text-destructive animate-fade-in text-center">{error}</p>
+            {error && (
+              <p className="text-sm text-destructive animate-fade-in">{error}</p>
+            )}
+
+            <Button
+              type="submit"
+              className="w-full"
+              size="lg"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                'Sign In'
               )}
-
-              <Button
-                type="submit"
-                className="w-full bg-[#f472b6] hover:bg-[#ec4899] text-white font-bold h-12 transition-all shadow-md active:scale-[0.98]"
-                size="lg"
-                disabled={isLoading || mfaCode.length < 6}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Verifying...
-                  </>
-                ) : (
-                  'Verify Code'
-                )}
-              </Button>
-
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full"
-                onClick={() => {
-                  setStep('credentials');
-                  setMfaCode('');
-                  setError('');
-                }}
-                disabled={isLoading}
-              >
-                Back to Login
-              </Button>
-            </form>
-          )}
+            </Button>
+          </form>
 
           <div className="mt-4 text-center">
             <button
