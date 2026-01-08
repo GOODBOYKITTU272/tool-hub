@@ -187,13 +187,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const initAuth = async () => {
             try {
-                // Get initial session with 60s timeout + retry (very slow environments)
+                // Get initial session - no timeout, trust Supabase's internal handling
                 const sessionRes = await withRetry(() =>
-                    withTimeout(
-                        supabase.auth.getSession(),
-                        60000,
-                        'Session check timed out'
-                    )
+                    supabase.auth.getSession()
                 ) as { data: { session: Session | null }, error: any };
 
                 const session = sessionRes.data?.session || null;
@@ -278,16 +274,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 return { success: false, error: domainCheck.error };
             }
 
-            // Sign in with Supabase Auth (60s timeout + retry for very slow networks)
+            // Sign in with Supabase Auth - no timeout, wait as long as needed
             const loginRes = await withRetry(() =>
-                withTimeout(
-                    supabase.auth.signInWithPassword({
-                        email: normalizedEmail,
-                        password: password,
-                    }),
-                    60000,
-                    'Login request timed out. Please check your connection.'
-                )
+                supabase.auth.signInWithPassword({
+                    email: normalizedEmail,
+                    password: password,
+                })
             ) as { data: { user: SupabaseUser | null, session: Session | null }, error: any };
 
             const { data, error } = loginRes;
