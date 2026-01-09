@@ -184,15 +184,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         console.log('🚀 AuthContext initializing...');
         let isMounted = true;
+        let hasCompletedInit = false;
 
         const initAuth = async () => {
             try {
-                // Get initial session - no timeout, trust Supabase's internal handling
-                const sessionRes = await withRetry(() =>
-                    supabase.auth.getSession()
+                console.log('⏳ [Auth] Starting initial session check...');
+
+                // Add timeout to getSession to prevent infinite hang on corrupt session data
+                const sessionRes = await withTimeout(
+                    withRetry(() => supabase.auth.getSession()),
+                    5000, // 5 second timeout for faster recovery
+                    'Session check timed out - possible corrupt session data'
                 ) as { data: { session: Session | null }, error: any };
 
                 const session = sessionRes.data?.session || null;
+                console.log('📦 [Auth] Initial session retrieved:', session ? 'Session exists' : 'No session');
 
                 if (!isMounted) return;
 
@@ -204,7 +210,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     if (isMounted) setIsMfaEnabled(mfaEnabled);
 
                     const cached = readCachedProfile(session.user.id);
-                    if (cached) setCurrentUser(cached);
+                    if (cached) {
+                        console.log('💾 [Auth] Using cached profile');
+                        setCurrentUser(cached);
+                    }
 
                     const profile = await fetchUserProfile(session.user.id);
                     if (!isMounted || seq !== authUpdateSeqRef.current) return;
@@ -217,11 +226,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 } else {
                     setCurrentUser(null);
                 }
-            } catch (err) {
+            } catch (err: any) {
                 console.error('❌ [Auth] Init error:', err);
+
+                // If session check timed out or failed, clear potentially corrupt session data
+                if (err.message?.includes('timed out') || err.message?.includes('corrupt')) {
+                    console.warn('🧹 [Auth] Clearing potentially corrupt session data...');
+                    try {
+                        localStorage.removeItem('tool-hub-auth');
+                        // Also try to clear any Supabase-generated keys
+                        Object.keys(localStorage).forEach(key => {
+                            if (key.startsWith('sb-')) localStorage.removeItem(key);
+                        });
+                    } catch (cleanupErr) {
+                        console.error('Failed to clean localStorage:', cleanupErr);
+                    }
+                }
+
                 if (isMounted) setCurrentUser(null);
             } finally {
-                if (isMounted) setLoading(false);
+                hasCompletedInit = true;
+                if (isMounted) {
+                    console.log('✅ [Auth] Initialization complete, setting loading to false');
+                    setLoading(false);
+                }
             }
         };
 
@@ -232,7 +260,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (!isMounted) return;
 
             const seq = ++authUpdateSeqRef.current;
-            console.log('🔄 [Auth] State change:', event);
+            console.log('🔄 [Auth] State change:', event, '| hasCompletedInit:', hasCompletedInit);
             setSession(session);
 
             if (session?.user) {
@@ -253,7 +281,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } else {
                 setCurrentUser(null);
             }
-            setLoading(false);
+
+            // If initAuth hasn't completed yet, set loading to false now
+            // This handles the case where onAuthStateChange fires before initAuth completes
+            if (!hasCompletedInit && isMounted) {
+                console.log('🔄 [Auth] Auth state changed before init completed, setting loading to false now');
+                setLoading(false);
+                hasCompletedInit = true; // Prevent double-setting if multiple events fire
+            }
         });
 
         return () => {
