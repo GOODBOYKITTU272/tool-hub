@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
@@ -47,7 +47,8 @@ export default function Tools() {
     fetchTools();
   }, []);
 
-  const fetchTools = async () => {
+  // Memoize fetchTools to prevent recreation
+  const fetchTools = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -71,10 +72,15 @@ export default function Tools() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]); // Stable dependencies - only recreate if toast changes
 
-  // Real-time subscription for tools
-  useRealtimeSubscription('tools', (payload) => {
+  // Initial fetch on mount
+  useEffect(() => {
+    fetchTools();
+  }, [fetchTools]);
+
+  // Stable callback for realtime subscription - prevents subscription thrashing
+  const handleRealtimeUpdate = useCallback((payload: any) => {
     if (payload.eventType === 'INSERT') {
       setTools(prev => [payload.new as Tool, ...prev]);
       toast({
@@ -90,7 +96,10 @@ export default function Tools() {
         description: 'A tool has been removed',
       });
     }
-  });
+  }, [toast]);
+
+  // Subscribe to real-time updates for tools table
+  useRealtimeSubscription('tools', handleRealtimeUpdate);
 
   // Filter tools by ownership and approval status
   // Owners can see all their own tools (any status) + approved tools from others

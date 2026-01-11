@@ -56,10 +56,16 @@ export default function AuditLogs() {
   const isAdmin = currentUser?.role === 'Admin';
 
   useEffect(() => {
-    if (isAdmin) {
-      fetchData();
+    if (!currentUser) return;
+
+    // Early return if not admin - prevents 400 errors on audit_logs table
+    if (!isAdmin) {
+      setLoading(false);
+      return;
     }
-  }, [isAdmin]);
+
+    fetchData();
+  }, [isAdmin, currentUser]);
 
   const fetchData = async () => {
     try {

@@ -29,7 +29,14 @@ export default function TeamLogs() {
     const isAdmin = currentUser?.role === 'Admin';
 
     useEffect(() => {
-        if (!currentUser || !isAdmin) return;
+        if (!currentUser) return;
+
+        // Early return if not admin - prevents 403 errors on daily_logs table
+        if (!isAdmin) {
+            setLoading(false);
+            return;
+        }
+
         fetchTeamMembers();
         fetchTeamLogs();
     }, [currentUser, isAdmin, selectedUser, dateRange]);

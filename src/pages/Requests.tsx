@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { KanbanBoard } from '@/components/kanban/KanbanBoard';
@@ -47,7 +47,8 @@ export default function Requests() {
     fetchRequests();
   }, []);
 
-  const fetchRequests = async () => {
+  // Memoize fetchRequests to prevent recreation
+  const fetchRequests = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -72,17 +73,14 @@ export default function Requests() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentUser]);  // Stable callback for realtime subscription - prevents subscription thrashing
+  const handleRealtimeUpdate = useCallback((payload: any) => {
+    console.log('📡 [Requests] Realtime update:', payload.eventType);
+    fetchRequests();
+  }, [fetchRequests]);
 
-  useRealtimeSubscription('requests', (payload) => {
-    if (payload.eventType === 'INSERT') {
-      setRequests(prev => [payload.new as Request, ...prev]);
-    } else if (payload.eventType === 'UPDATE') {
-      setRequests(prev => prev.map(r => r.id === payload.new.id ? payload.new as Request : r));
-    } else if (payload.eventType === 'DELETE') {
-      setRequests(prev => prev.filter(r => r.id !== payload.old.id));
-    }
-  });
+  // Subscribe to real-time updates
+  useRealtimeSubscription('requests', handleRealtimeUpdate);
 
   const allRequests = requests;
   const filteredByTool = toolFilter === 'all'

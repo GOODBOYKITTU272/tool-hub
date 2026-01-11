@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { ToolCard } from '@/components/tools/ToolCard';
@@ -42,18 +42,8 @@ export default function Dashboard() {
   const isOwner = currentUser?.role === 'Owner';
   const canAddTools = isAdmin || isOwner;
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, [currentUser]);
-
-  // Subscribe to real-time updates for tools table
-  useRealtimeSubscription('tools', (payload) => {
-    console.log('📡 [Dashboard] Realtime update:', payload.eventType);
-    // Refresh dashboard whenever tools are inserted, updated, or deleted
-    fetchDashboardData();
-  });
-
-  const fetchDashboardData = async () => {
+  // Memoize fetchDashboardData to prevent recreation
+  const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -141,7 +131,21 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentUser, isAdmin, isOwner]); // Stable dependencies
+
+  // Initial fetch on mount
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  // Stable callback for realtime subscription - prevents subscription thrashing
+  const handleRealtimeUpdate = useCallback((payload: any) => {
+    console.log('📡 [Dashboard] Realtime update:', payload.eventType);
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  // Subscribe to real-time updates for tools table
+  useRealtimeSubscription('tools', handleRealtimeUpdate);
 
   return (
     <div className="space-y-8 animate-fade-in">

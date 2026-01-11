@@ -69,14 +69,14 @@ const App = () => (
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/tools" element={<Tools />} />
                   <Route path="/tools/:id" element={<ToolDetail />} />
-                  <Route path="/requests" element={<ProtectedRoute><Requests /></ProtectedRoute>} />
+                  <Route path="/requests" element={<Requests />} />
                   <Route path="/daily-journal" element={<DailyJournal />} />
                   <Route path="/team-logs" element={<TeamLogs />} />
                   <Route path="/pending-tools" element={<PendingTools />} />
                   <Route path="/users" element={<Users />} />
                   <Route path="/audit-logs" element={<AuditLogs />} />
-                  <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-                  <Route path="/chatgpt-usage" element={<ProtectedRoute><ChatGPTUsage /></ProtectedRoute>} />
+                  <Route path="/profile" element={<Profile />} />
+                  <Route path="/chatgpt-usage" element={<ChatGPTUsage />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>
