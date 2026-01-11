@@ -1,23 +1,24 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 /**
  * Custom hook for real-time Supabase subscriptions
- *
- * @param table - Table name to subscribe to
- * @param callback - Callback function to handle changes
- * @param event - Event type to listen for ('INSERT', 'UPDATE', 'DELETE', or '*' for all)
- * @param filter - Optional filter for the subscription
+ * Uses useRef to store callback - prevents subscription thrashing
  */
 export function useRealtimeSubscription(
     table: string,
     callback: (payload: RealtimePostgresChangesPayload<any>) => void,
     event: 'INSERT' | 'UPDATE' | 'DELETE' | '*' = '*',
     filter?: string
-) {
-    // Memoize callback to prevent unnecessary re-subscriptions
-    const memoizedCallback = useCallback(callback, [callback]);
+): void {
+    // Store callback in ref to prevent re-subscriptions when callback changes
+    const callbackRef = useRef(callback);
+
+    // Always update the ref to latest callback
+    useEffect(() => {
+        callbackRef.current = callback;
+    }, [callback]);
 
     useEffect(() => {
         console.log(`Subscribing to ${table} table (event: ${event})`);
@@ -33,8 +34,8 @@ export function useRealtimeSubscription(
                     filter: filter
                 },
                 (payload: RealtimePostgresChangesPayload<any>) => {
-                    console.log(`Real-time update on ${table}:`, payload.eventType, payload);
-                    memoizedCallback(payload);
+                    console.log(`Real-time update on ${table}:`, payload.eventType);
+                    callbackRef.current(payload);
                 }
             )
             .subscribe((status) => {
@@ -51,13 +52,11 @@ export function useRealtimeSubscription(
             console.log(`Unsubscribing from ${table} table`);
             channel.unsubscribe();
         };
-    }, [table, event, filter, memoizedCallback]);
+    }, [table, event, filter]); // callback NOT in deps - uses ref instead
 }
 
 /**
  * Custom hook for subscribing to multiple tables
- *
- * @param subscriptions - Array of subscription configurations
  */
 export function useMultipleRealtimeSubscriptions(
     subscriptions: Array<{
@@ -66,11 +65,19 @@ export function useMultipleRealtimeSubscriptions(
         event?: 'INSERT' | 'UPDATE' | 'DELETE' | '*';
         filter?: string;
     }>
-) {
-    useEffect(() => {
-        console.log(`Subscribing to ${subscriptions.length} tables`);
+): void {
+    // Store subscriptions in ref
+    const subsRef = useRef(subscriptions);
 
-        const channels = subscriptions.map(({ table, callback, event = '*', filter }) => {
+    useEffect(() => {
+        subsRef.current = subscriptions;
+    }, [subscriptions]);
+
+    useEffect(() => {
+        const subs = subsRef.current;
+        console.log(`Subscribing to ${subs.length} tables`);
+
+        const channels = subs.map(({ table, callback, event = '*', filter }) => {
             const channel = supabase
                 .channel(`${table}-${event}-multi-channel`)
                 .on(
@@ -96,23 +103,24 @@ export function useMultipleRealtimeSubscriptions(
         });
 
         return () => {
-            console.log(`Unsubscribing from ${subscriptions.length} tables`);
+            console.log(`Unsubscribing from ${subs.length} tables`);
             channels.forEach((channel) => channel.unsubscribe());
         };
-    }, [subscriptions]);
+    }, []); // Empty deps - uses ref
 }
 
 /**
  * Custom hook for subscribing to user-specific notifications
- *
- * @param userId - User ID to subscribe to notifications for
- * @param callback - Callback function to handle new notifications
  */
 export function useNotificationSubscription(
     userId: string,
     callback: (payload: RealtimePostgresChangesPayload<any>) => void
-) {
-    const memoizedCallback = useCallback(callback, [callback]);
+): void {
+    const callbackRef = useRef(callback);
+
+    useEffect(() => {
+        callbackRef.current = callback;
+    }, [callback]);
 
     useEffect(() => {
         if (!userId) return;
@@ -131,7 +139,7 @@ export function useNotificationSubscription(
                 },
                 (payload: RealtimePostgresChangesPayload<any>) => {
                     console.log(`New notification for user ${userId}:`, payload.new);
-                    memoizedCallback(payload);
+                    callbackRef.current(payload);
                 }
             )
             .subscribe((status) => {
@@ -144,5 +152,5 @@ export function useNotificationSubscription(
             console.log(`Unsubscribing from notifications for user ${userId}`);
             channel.unsubscribe();
         };
-    }, [userId, memoizedCallback]);
+    }, [userId]); // Only userId, not callback
 }
