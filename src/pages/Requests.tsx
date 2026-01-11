@@ -43,10 +43,6 @@ export default function Requests() {
   const isOwner = currentUser?.role === 'Owner';
   const isAdmin = currentUser?.role === 'Admin';
 
-  useEffect(() => {
-    fetchRequests();
-  }, []);
-
   // Memoize fetchRequests to prevent recreation
   const fetchRequests = useCallback(async () => {
     try {
@@ -73,7 +69,15 @@ export default function Requests() {
     } finally {
       setLoading(false);
     }
-  }, [currentUser]);  // Stable callback for realtime subscription - prevents subscription thrashing
+  }, [toast]); // Only recreate if toast changes
+
+  // Initial fetch on mount
+  useEffect(() => {
+    fetchRequests();
+  }, [fetchRequests]);
+
+
+  // Stable callback for realtime subscription - prevents subscription thrashing
   const handleRealtimeUpdate = useCallback((payload: any) => {
     console.log('📡 [Requests] Realtime update:', payload.eventType);
     fetchRequests();
