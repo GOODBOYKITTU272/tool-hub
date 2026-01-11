@@ -525,7 +525,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             console.log(`✅ [Auth] Cleared ${clearedCount} localStorage keys`);
 
-            // Step 3: Reset all React state
+            // Step 3: Reset React state FIRST (before navigation)
+            // This is crucial: setting currentUser=null disables ReloadProtection
+            // BEFORE window.location.href triggers the beforeunload event
             setCurrentUser(null);
             setSession(null);
             setIsMfaEnabled(false);
@@ -534,7 +536,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setLoading(false);
             console.log('✅ [Auth] React state reset');
 
-            // Step 4: Force navigation to login page (hard refresh)
+            // Step 4: Small delay to ensure React state updates propagate
+            // This gives ReloadProtection time to disable before navigation
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            // Step 5: Force navigation to login page (hard refresh)
             // Using window.location ensures complete state reset
             console.log('🔄 [Auth] Redirecting to login...');
             window.location.href = '/login';
