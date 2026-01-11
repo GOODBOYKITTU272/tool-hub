@@ -8,6 +8,7 @@ import { NotificationProvider } from "@/contexts/NotificationContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ReloadProtection } from "@/components/ReloadProtection";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Suspense, lazy, useEffect } from "react";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -45,47 +46,49 @@ function HashRedirectHandler() {
 }
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <NotificationProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <HashRedirectHandler />
-            <ReloadProtection />
-            <Suspense fallback={null}>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/password-reset" element={<PasswordReset />} />
-                <Route
-                  element={
-                    <ProtectedRoute>
-                      <AppLayout />
-                    </ProtectedRoute>
-                  }
-                >
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/tools" element={<Tools />} />
-                  <Route path="/tools/:id" element={<ToolDetail />} />
-                  <Route path="/requests" element={<Requests />} />
-                  <Route path="/daily-journal" element={<DailyJournal />} />
-                  <Route path="/team-logs" element={<TeamLogs />} />
-                  <Route path="/pending-tools" element={<PendingTools />} />
-                  <Route path="/users" element={<Users />} />
-                  <Route path="/audit-logs" element={<AuditLogs />} />
-                  <Route path="/profile" element={<Profile />} />
-                  <Route path="/chatgpt-usage" element={<ChatGPTUsage />} />
-                </Route>
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
-          </BrowserRouter>
-        </TooltipProvider>
-      </NotificationProvider>
-    </AuthProvider>
-  </QueryClientProvider>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <NotificationProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <HashRedirectHandler />
+              <ReloadProtection />
+              <Suspense fallback={null}>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/password-reset" element={<PasswordReset />} />
+                  <Route
+                    element={
+                      <ProtectedRoute>
+                        <AppLayout />
+                      </ProtectedRoute>
+                    }
+                  >
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/tools" element={<Tools />} />
+                    <Route path="/tools/:id" element={<ToolDetail />} />
+                    <Route path="/requests" element={<Requests />} />
+                    <Route path="/daily-journal" element={<DailyJournal />} />
+                    <Route path="/team-logs" element={<TeamLogs />} />
+                    <Route path="/pending-tools" element={<PendingTools />} />
+                    <Route path="/users" element={<Users />} />
+                    <Route path="/audit-logs" element={<AuditLogs />} />
+                    <Route path="/profile" element={<Profile />} />
+                    <Route path="/chatgpt-usage" element={<ChatGPTUsage />} />
+                  </Route>
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Suspense>
+            </BrowserRouter>
+          </TooltipProvider>
+        </NotificationProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
