@@ -69,7 +69,7 @@ export default function Requests() {
     } finally {
       setLoading(false);
     }
-  }, [toast]); // Only recreate if toast changes
+  }, [toast]);
 
   // Initial fetch on mount
   useEffect(() => {
@@ -86,14 +86,9 @@ export default function Requests() {
   // Subscribe to real-time updates
   useRealtimeSubscription('requests', handleRealtimeUpdate);
 
-  const allRequests = requests;
-  const filteredByTool = toolFilter === 'all'
-    ? allRequests
-    : allRequests.filter(r => r.tool_id === toolFilter);
+  const filteredByTool = toolFilter === 'all' ? requests : requests.filter(r => r.tool_id === toolFilter);
 
-  // Apply filters
   const filteredRequests = filteredByTool.filter(r => {
-    // Status filter
     if (filters.status !== 'all' && r.status !== filters.status) {
       return false;
     }
@@ -104,19 +99,17 @@ export default function Requests() {
       const now = new Date();
       const diffDays = Math.floor((now.getTime() - requestDate.getTime()) / (1000 * 60 * 60 * 24));
 
-      switch (filters.dateRange) {
-        case 'today':
-          if (diffDays > 0) return false;
-          break;
-        case 'week':
-          if (diffDays > 7) return false;
-          break;
-        case 'month':
-          if (diffDays > 30) return false;
-          break;
-        case '3months':
-          if (diffDays > 90) return false;
-          break;
+      if (filters.dateRange === 'today' && diffDays > 0) {
+        return false;
+      }
+      if (filters.dateRange === 'week' && diffDays > 7) {
+        return false;
+      }
+      if (filters.dateRange === 'month' && diffDays > 30) {
+        return false;
+      }
+      if (filters.dateRange === '3months' && diffDays > 90) {
+        return false;
       }
     }
 

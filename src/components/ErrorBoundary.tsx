@@ -14,9 +14,6 @@ interface ErrorBoundaryState {
 
 const INITIAL_STATE: ErrorBoundaryState = { hasError: false, error: null };
 
-/**
- * ErrorBoundary - Catches JavaScript errors and shows a user-friendly fallback UI.
- */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     state = INITIAL_STATE;
 
@@ -28,11 +25,11 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
         console.error('ErrorBoundary caught an error:', error, errorInfo);
     }
 
-    private reload = (): void => {
+    reload = () => {
         window.location.reload();
     };
 
-    private goHome = (): void => {
+    goHome = () => {
         window.location.href = '/dashboard';
     };
 

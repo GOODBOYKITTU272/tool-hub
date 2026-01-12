@@ -39,10 +39,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const PROFILE_CACHE_PREFIX = 'tool-hub-profile:';
 
-    // Helper to normalize email (lowercase)
     const normalizeEmail = (email: string) => email.toLowerCase().trim();
 
-    // Helper to validate ApplyWizz email domain
     const validateEmailDomain = (email: string): { valid: boolean; error?: string } => {
         const normalizedEmail = normalizeEmail(email);
         const domain = normalizedEmail.split('@')[1];
@@ -57,7 +55,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { valid: true };
     };
 
-    // Helper to add timeout to promises
     const withTimeout = async <T,>(promise: Promise<T> | any, timeoutMs: number, errorMsg: string): Promise<T> => {
         let timeoutId: any;
         const timeoutPromise = new Promise<never>((_, reject) => {
@@ -65,14 +62,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
 
         try {
-            // Ensure we are racing a real promise
             return await Promise.race([Promise.resolve(promise), timeoutPromise]);
         } finally {
             if (timeoutId) clearTimeout(timeoutId);
         }
     };
 
-    // Helper to retry failed requests (for cold starts)
     const withRetry = async <T,>(fn: () => Promise<T>, retries = 1): Promise<T> => {
         for (let i = 0; i <= retries; i++) {
             try {
@@ -83,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
                 if (shouldRetry) {
                     console.log(`🔄 Retry ${i + 1}/${retries} after timeout...`);
-                    await new Promise(r => setTimeout(r, 2000)); // Wait 2s before retry
+                    await new Promise(r => setTimeout(r, 2000));
                     continue;
                 }
                 throw error;
@@ -108,11 +103,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (typeof window === 'undefined') return;
             window.localStorage.setItem(`${PROFILE_CACHE_PREFIX}${profile.id}`, JSON.stringify(profile));
         } catch {
-            // ignore storage errors
+            // Ignore storage errors
         }
     };
 
-    // Fetch user profile from public.users
     const fetchUserProfileInternal = async (authUserId: string): Promise<User | null> => {
         try {
             console.log(`🔍 [Auth] Profile Fetch for ${authUserId}`);
@@ -123,10 +117,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 .eq('id', authUserId)
                 .single();
 
-            // 30 second timeout for profile fetch (cold starts)
             const profileRes = await withTimeout(
                 fetchPromise,
-                90000, // Increased to 90s for very slow environments
+                90000,
                 'Profile fetch timed out'
             ) as { data: any, error: any };
 
@@ -167,7 +160,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
 
-    // Helper to check MFA status
     const checkMfaStatus = async () => {
         try {
             const { data, error } = await supabase.auth.mfa.listFactors();
@@ -180,7 +172,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    // Initialize auth state
     useEffect(() => {
         console.log('🚀 AuthContext initializing...');
         let isMounted = true;
@@ -190,10 +181,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             try {
                 console.log('⏳ [Auth] Starting initial session check...');
 
-                // Add timeout to getSession to prevent infinite hang on corrupt session data
                 const sessionRes = await withTimeout(
                     withRetry(() => supabase.auth.getSession()),
-                    5000, // 5 second timeout for faster recovery
+                    5000,
                     'Session check timed out - possible corrupt session data'
                 ) as { data: { session: Session | null }, error: any };
 
@@ -229,12 +219,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } catch (err: any) {
                 console.error('❌ [Auth] Init error:', err);
 
-                // If session check timed out or failed, clear potentially corrupt session data
-                if (err.message?.includes('timed out') || err.message?.includes('corrupt')) {
+                const isCorruptSession = err.message?.includes('timed out') || err.message?.includes('corrupt');
+                if (isCorruptSession) {
                     console.warn('🧹 [Auth] Clearing potentially corrupt session data...');
                     try {
                         localStorage.removeItem('tool-hub-auth');
-                        // Also try to clear any Supabase-generated keys
                         Object.keys(localStorage).forEach(key => {
                             if (key.startsWith('sb-')) localStorage.removeItem(key);
                         });
@@ -255,7 +244,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         initAuth();
 
-        // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (!isMounted) return;
 
@@ -282,8 +270,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setCurrentUser(null);
             }
 
-            // If initAuth hasn't completed yet, set loading to false now
-            // This handles the case where onAuthStateChange fires before initAuth completes
             if (!hasCompletedInit && isMounted) {
                 console.log('🔄 [Auth] Auth state changed before init completed, setting loading to false now');
                 setLoading(false);

@@ -2,20 +2,14 @@ import { useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
-/**
- * Custom hook for real-time Supabase subscriptions
- * Uses useRef to store callback - prevents subscription thrashing
- */
 export function useRealtimeSubscription(
     table: string,
     callback: (payload: RealtimePostgresChangesPayload<any>) => void,
     event: 'INSERT' | 'UPDATE' | 'DELETE' | '*' = '*',
     filter?: string
 ): void {
-    // Store callback in ref to prevent re-subscriptions when callback changes
     const callbackRef = useRef(callback);
 
-    // Always update the ref to latest callback
     useEffect(() => {
         callbackRef.current = callback;
     }, [callback]);
@@ -52,12 +46,9 @@ export function useRealtimeSubscription(
             console.log(`Unsubscribing from ${table} table`);
             channel.unsubscribe();
         };
-    }, [table, event, filter]); // callback NOT in deps - uses ref instead
+    }, [table, event, filter]);
 }
 
-/**
- * Custom hook for subscribing to multiple tables
- */
 export function useMultipleRealtimeSubscriptions(
     subscriptions: Array<{
         table: string;
@@ -66,7 +57,6 @@ export function useMultipleRealtimeSubscriptions(
         filter?: string;
     }>
 ): void {
-    // Store subscriptions in ref
     const subsRef = useRef(subscriptions);
 
     useEffect(() => {
@@ -106,12 +96,9 @@ export function useMultipleRealtimeSubscriptions(
             console.log(`Unsubscribing from ${subs.length} tables`);
             channels.forEach((channel) => channel.unsubscribe());
         };
-    }, []); // Empty deps - uses ref
+    }, []);
 }
 
-/**
- * Custom hook for subscribing to user-specific notifications
- */
 export function useNotificationSubscription(
     userId: string,
     callback: (payload: RealtimePostgresChangesPayload<any>) => void
@@ -152,5 +139,5 @@ export function useNotificationSubscription(
             console.log(`Unsubscribing from notifications for user ${userId}`);
             channel.unsubscribe();
         };
-    }, [userId]); // Only userId, not callback
+    }, [userId]);
 }
